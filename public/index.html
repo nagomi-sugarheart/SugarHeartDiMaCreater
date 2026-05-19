@@ -191,6 +191,7 @@
       [data-daima]:hover .dm-rh,[data-daima].dm-sel .dm-rh{opacity:1!important}
       [data-daima^="text-"]::after{content:'✎';position:absolute!important;bottom:-22px!important;left:50%!important;transform:translateX(-50%)!important;font-size:13px!important;background:#E8B4C0!important;color:white!important;border-radius:10px!important;padding:1px 7px!important;opacity:0!important;transition:opacity 0.18s!important;white-space:nowrap!important;font-style:normal!important;pointer-events:none!important;z-index:99998!important;}
       [data-daima^="text-"]:hover::after,[data-daima^="text-"].dm-sel::after{opacity:1!important;}
+      img[data-daima^="image-"],[data-daima^="image-"] img{object-fit:cover!important;object-position:center center!important;}
     `;
 
     // タップでモーダルを開く版（contenteditable廃止）
@@ -596,19 +597,16 @@
         setSaving(true);
         const captures=[];
         const iframe=iframeRef.current;
-        let rhEls=[],selEls=[],pageOverflows=[];
+        let rhEls=[],selEls=[];
         try{
           if(!window.html2canvas||!iframe?.contentDocument)throw new Error("not ready");
           // ── キャプチャ前クリーンアップ ──
-          // ①回転ハンドル(.dm-rh)を非表示（dm-cssは除去しない→レイアウト維持）
+          // ①回転ハンドル(.dm-rh)を非表示（dm-cssは除去しない→レイアウト崩れ防止）
           rhEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-rh'));
           rhEls.forEach(el=>{el.style.display='none';});
           // ②選択状態クラスを除去（hover/selスタイルが入らないよう）
           selEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-sel'));
           selEls.forEach(el=>el.classList.remove('dm-sel'));
-          // ③.dm-page の overflow:hidden を visible に変更（テキスト切れ防止）
-          const pageEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-page'));
-          pageEls.forEach(el=>{pageOverflows.push(el.style.overflow);el.style.overflow='visible';});
           // スクロールをトップにリセット
           try{
             iframe.contentWindow.scrollTo(0,0);
@@ -624,6 +622,7 @@
           ]).catch(()=>{});
           await new Promise(r=>setTimeout(r,600));
           // .dm-page 要素があれば個別キャプチャ、なければドキュメント全体
+          const pageEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-page'));
           const targets=pageEls.length>0?pageEls:[iframe.contentDocument.documentElement];
           for(const target of targets){
             try{
@@ -644,8 +643,6 @@
           // ── キャプチャ後復元 ──
           rhEls.forEach(el=>{el.style.display='';});
           selEls.forEach(el=>el.classList.add('dm-sel'));
-          const pageEls2=Array.from(iframe?.contentDocument?.querySelectorAll('.dm-page')||[]);
-          pageEls2.forEach((el,i)=>{el.style.overflow=pageOverflows[i]||'';});
           setSaving(false);
         }
         setCompletedUrls(captures.length>0?captures:[null]);
