@@ -217,7 +217,8 @@
         var isText=id.indexOf('text-')===0;
         ST[id]={x:0,y:0,r:0,s:1,fs:100};
         if(window.getComputedStyle(el).position==='static')el.style.position='relative';
-        if(isText)el.style.zIndex='100';
+        if(isText)el.style.zIndex='9999';
+        else if(id.indexOf('image-')===0)el.style.zIndex='1';
         var rh=document.createElement('span');
         rh.className='dm-rh';rh.textContent='↻';el.appendChild(rh);
 
@@ -308,6 +309,9 @@
       const [editModal, setEditModal] = useState(null);
       const textValsRef = useRef({});
       useEffect(()=>{ textValsRef.current = textVals; },[textVals]);
+      const [textColors, setTextColors] = useState({});
+      const textColorsRef = useRef({});
+      useEffect(()=>{ textColorsRef.current = textColors; },[textColors]);
       // iframeから自動抽出したテキスト（rawHtml改変なし・直接DOM操作）
       const [autoTexts, setAutoTexts] = useState({});
       const autoTextsRef = useRef({});
@@ -336,6 +340,7 @@
               num,
               text: textValsRef.current[num] || autoTextsRef.current[num] || e.data.text || "",
               fs: transRef.current[e.data.id]?.fs || 100,
+              color: textColorsRef.current[e.data.id] || "",
             });
             return;
           }
@@ -354,13 +359,15 @@
         let html=rawHtml;
         html=html.replace(/\{\{TEXT_(\d+)\}\}/g,(_,id)=>{
           const v=textVals[id]||`<em style="color:#ccc;font-style:italic;font-size:0.82em">テキスト${id}</em>`;
-          return `<span data-daima="text-${id}" style="display:inline-block">${v}</span>`;
+          const col=textColors['text-'+id];
+          const s='display:inline-block'+(col?';color:'+col:'');
+          return '<span data-daima="text-'+id+'" style="'+s+'">'+v+'</span>';
         });
         html=html.replace(/(<img[^>]*?)src=["']?\{\{IMAGE_(\d+)\}\}["']?([^>]*?>)/g,(_,bef,id,aft)=>
           `${bef}src="${imgUrls[id]||fallbackSvg(id)}" data-daima="image-${id}"${aft}`
         );
         return html;
-      },[rawHtml,textVals,imgUrls]);
+      },[rawHtml,textVals,imgUrls,textColors]);
 
       const [srcDoc,setSrcDoc]=useState("");
       useEffect(()=>{
@@ -458,6 +465,11 @@
             const el=doc.querySelector('[data-daima="'+id+'"]');
             if(el)el.style.display="none";
           });
+          // テキスト色を再適用
+          Object.entries(textColorsRef.current).forEach(([id,color])=>{
+            const el=doc.querySelector('[data-daima="'+id+'"]');
+            if(el&&color)el.style.color=color;
+          });
         },150);
       },[]);
 
@@ -482,15 +494,21 @@
         if(!editModal)return;
         const num=editModal.num;
         const isAuto=!textIds.includes(num);
+        const color=editModal.color||"";
         if(isAuto){
           // 自動抽出テキスト：autoTexts を更新しiframe DOMを直接書き換え
           setAutoTexts(p=>({...p,[num]:editModal.text}));
           const el=iframeRef.current?.contentDocument?.querySelector('[data-daima="text-'+num+'"]');
-          if(el)Array.from(el.childNodes).forEach(nd=>{if(nd.nodeType===3&&nd.textContent.trim())nd.textContent=editModal.text;});
+          if(el){
+            Array.from(el.childNodes).forEach(nd=>{if(nd.nodeType===3&&nd.textContent.trim())nd.textContent=editModal.text;});
+            if(color)el.style.color=color; else el.style.color="";
+          }
         }else{
           // プレースホルダー方式：textVals を更新（baseHtml経由でiframeに反映）
           setTextVals(p=>({...p,[num]:editModal.text}));
         }
+        // 色を保存（autoTexts・placeholder共通）
+        setTextColors(p=>({...p,[editModal.id]:color}));
         const nt={...transRef.current,[editModal.id]:{...(transRef.current[editModal.id]||{x:0,y:0,r:0,s:1}),fs:editModal.fs}};
         setTrans(nt);applyTrans(nt);setEditModal(null);
       },[editModal,applyTrans,textIds]);
@@ -556,7 +574,7 @@
           if(!html.includes("<html")&&!html.includes("<!DOCTYPE"))throw new Error("HTMLの生成に失敗しました。もう一度お試しください。");
           setChatHist([...msgs,{role:"assistant",content:html}]);
           const {html:procHtml, texts:initTexts}=processHtmlFromAI(html);
-          setRawHtml(procHtml);setTextVals(initTexts);setTrans({});setHiddenElems([]);setAutoTexts({});setAutoImgs({});setScreen("edit");setActiveTab("preview");
+          setRawHtml(procHtml);setTextVals(initTexts);setTrans({});setHiddenElems([]);setAutoTexts({});setAutoImgs({});setTextColors({});setScreen("edit");setActiveTab("preview");
         }catch(e){setError(e.message);}finally{setLoading(false);}
       };
 
@@ -568,7 +586,7 @@
           const html=await callApi(systemRef.current,msgs);
           setChatHist([...msgs,{role:"assistant",content:html}]);
           const {html:procHtml2, texts:initTexts2}=processHtmlFromAI(html);
-          setRawHtml(procHtml2);setTextVals(initTexts2);setTrans({});setHiddenElems([]);setAutoTexts({});setAutoImgs({});setRevise("");
+          setRawHtml(procHtml2);setTextVals(initTexts2);setTrans({});setHiddenElems([]);setAutoTexts({});setAutoImgs({});setTextColors({});setRevise("");
           if(isMobile)setActiveTab("preview");
         }catch(e){setError(e.message);}finally{setLoading(false);}
       };
@@ -759,7 +777,7 @@
                 <button onClick={()=>{
                   const num=elemId.replace("text-","");
                   const isAuto=textIds.length===0||!textIds.includes(num);
-                  setEditModal({id:elemId,num,text:(isAuto?autoTexts[num]:textVals[num])||"",fs:t.fs||100});
+                  setEditModal({id:elemId,num,text:(isAuto?autoTexts[num]:textVals[num])||"",fs:t.fs||100,color:textColors[elemId]||""});
                 }} style={{fontSize:"0.66rem",color:C.white,background:C.dark,border:"none",borderRadius:"5px",padding:"3px 8px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>
                   ✎ 文字を編集
                 </button>
@@ -802,7 +820,7 @@
                 <div key={id} style={{marginBottom:"12px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
                     <label style={{fontSize:"0.78rem",fontWeight:"bold",color:C.dark}}>テキスト {id}</label>
-                    <button onClick={()=>setEditModal({id:`text-${id}`,num:id,text:textVals[id]||"",fs:trans[`text-${id}`]?.fs||100})}
+                    <button onClick={()=>setEditModal({id:`text-${id}`,num:id,text:textVals[id]||"",fs:trans[`text-${id}`]?.fs||100,color:textColors[`text-${id}`]||""})}
                       style={{fontSize:"0.72rem",color:C.white,background:C.dark,border:"none",borderRadius:"8px",padding:"4px 10px",cursor:"pointer",fontFamily:FONT}}>
                       🅰 サイズも変える
                     </button>
@@ -827,7 +845,7 @@
                 <div key={num} style={{marginBottom:"12px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
                     <label style={{fontSize:"0.78rem",fontWeight:"bold",color:C.dark}}>テキスト {num}</label>
-                    <button onClick={()=>setEditModal({id:`text-${num}`,num,text,fs:trans[`text-${num}`]?.fs||100})}
+                    <button onClick={()=>setEditModal({id:`text-${num}`,num,text,fs:trans[`text-${num}`]?.fs||100,color:textColors[`text-${num}`]||""})}
                       style={{fontSize:"0.72rem",color:C.white,background:C.dark,border:"none",borderRadius:"8px",padding:"4px 10px",cursor:"pointer",fontFamily:FONT}}>
                       🅰 サイズも変える
                     </button>
@@ -973,6 +991,24 @@
                 style={{width:"100%",accentColor:C.dark,cursor:"pointer"}} />
               <div style={{display:"flex",justifyContent:"space-between",fontSize:"0.7rem",color:"#ccc",marginTop:"2px"}}>
                 <span>小さく(30%)</span><span>標準(100%)</span><span>大きく(300%)</span>
+              </div>
+            </div>
+            {/* 文字色 */}
+            <div style={{marginBottom:"18px"}}>
+              <div style={{fontSize:"0.78rem",color:C.gray,marginBottom:"8px",fontWeight:"bold"}}>🎨 文字の色</div>
+              <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
+                <input type="color" value={editModal.color||"#333333"}
+                  onChange={e=>setEditModal(p=>({...p,color:e.target.value}))}
+                  style={{width:"44px",height:"36px"}} />
+                <button onClick={()=>setEditModal(p=>({...p,color:""}))}
+                  style={{fontSize:"0.7rem",padding:"5px 10px",background:"#f0f0f0",border:"1px solid #ddd",borderRadius:"8px",cursor:"pointer",color:C.gray,fontFamily:FONT}}>
+                  リセット
+                </button>
+                {["#ffffff","#000000","#ff4da6","#ff0000","#ff8800","#ffee00","#00cc44","#0066ff","#9900ff"].map(c=>(
+                  <div key={c} onClick={()=>setEditModal(p=>({...p,color:c}))}
+                    style={{width:"26px",height:"26px",borderRadius:"50%",background:c,cursor:"pointer",
+                      border:editModal.color===c?"3px solid "+C.dark:"2px solid #ccc",flexShrink:0}} />
+                ))}
               </div>
             </div>
             {/* ボタン */}
