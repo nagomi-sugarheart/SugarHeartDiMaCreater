@@ -596,12 +596,19 @@
         setSaving(true);
         const captures=[];
         const iframe=iframeRef.current;
-        let dmCss=null;
+        let rhEls=[],selEls=[],pageOverflows=[];
         try{
           if(!window.html2canvas||!iframe?.contentDocument)throw new Error("not ready");
-          // インタラクションCSSを一時除去（ドラッグUI非表示）
-          dmCss=iframe.contentDocument.querySelector("#dm-css");
-          if(dmCss)dmCss.remove();
+          // ── キャプチャ前クリーンアップ ──
+          // ①回転ハンドル(.dm-rh)を非表示（dm-cssは除去しない→レイアウト維持）
+          rhEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-rh'));
+          rhEls.forEach(el=>{el.style.display='none';});
+          // ②選択状態クラスを除去（hover/selスタイルが入らないよう）
+          selEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-sel'));
+          selEls.forEach(el=>el.classList.remove('dm-sel'));
+          // ③.dm-page の overflow:hidden を visible に変更（テキスト切れ防止）
+          const pageEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-page'));
+          pageEls.forEach(el=>{pageOverflows.push(el.style.overflow);el.style.overflow='visible';});
           // スクロールをトップにリセット
           try{
             iframe.contentWindow.scrollTo(0,0);
@@ -610,20 +617,19 @@
           }catch(e){}
           // トランスフォームを再適用してDOMに確実に反映（Bug 7-4対策）
           applyTrans(transRef.current);
-          // フォント・描画完了を十分に待つ（Bug 7-4対策）
+          // フォント・描画完了を十分に待つ
           await Promise.race([
             iframe.contentDocument.fonts.ready,
             new Promise(r=>setTimeout(r,2000))
           ]).catch(()=>{});
           await new Promise(r=>setTimeout(r,600));
           // .dm-page 要素があれば個別キャプチャ、なければドキュメント全体
-          const pages=Array.from(iframe.contentDocument.querySelectorAll('.dm-page'));
-          const targets=pages.length>0?pages:[iframe.contentDocument.documentElement];
+          const targets=pageEls.length>0?pageEls:[iframe.contentDocument.documentElement];
           for(const target of targets){
             try{
               const canvas=await window.html2canvas(target,{
                 useCORS:true,allowTaint:false,scale:2,logging:false,
-                backgroundColor:"#ffffff",imageTimeout:15000,
+                backgroundColor:null,imageTimeout:15000,
                 scrollX:0,scrollY:0,windowWidth:360,
               });
               captures.push(canvas.toDataURL("image/png"));
@@ -635,12 +641,11 @@
         }catch(err){
           console.error("Save failed:",err);
         }finally{
-          // インタラクションCSS復元
-          if(dmCss&&iframe?.contentDocument){
-            const ns=iframe.contentDocument.createElement("style");
-            ns.id="dm-css";ns.textContent=INTERACTION_CSS;
-            iframe.contentDocument.head?.appendChild(ns);
-          }
+          // ── キャプチャ後復元 ──
+          rhEls.forEach(el=>{el.style.display='';});
+          selEls.forEach(el=>el.classList.add('dm-sel'));
+          const pageEls2=Array.from(iframe?.contentDocument?.querySelectorAll('.dm-page')||[]);
+          pageEls2.forEach((el,i)=>{el.style.overflow=pageOverflows[i]||'';});
           setSaving(false);
         }
         setCompletedUrls(captures.length>0?captures:[null]);
