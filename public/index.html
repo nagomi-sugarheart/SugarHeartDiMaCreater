@@ -168,8 +168,8 @@
    - <img>タグの直前に <!-- ここで画像を書き換える --> コメントを挿入する。
    - <img>タグには必ず width:100%; height:100%; object-fit:cover; object-position:center; を設定する。
 4. **テキスト**:
-   - **【絶対必須】テキストを配置する全ての箇所に {{TEXT_1}}, {{TEXT_2}}, {{TEXT_3}} などのプレースホルダーを必ず使用すること。プレースホルダーなしでテキストを直接HTMLに書いてはいけない。**
-   - TEXT_CONTENTが「おまかせ」の場合は佐藤心らしいセリフ・キャッチコピーをAIが自動生成し、各プレースホルダーに割り当てる。
+   - **【絶対必須】テキストを配置する全ての箇所に {{TEXT_1:表示テキスト}}, {{TEXT_2:表示テキスト}} の形式のプレースホルダーを使用すること。コロンの後に実際に表示したいテキスト内容を必ず記述すること（例: {{TEXT_1:トップまで頼むわ☆}}）。プレースホルダーのない裸のテキストをHTMLに書いてはいけない。**
+   - TEXT_CONTENTが「おまかせ」の場合は佐藤心らしいセリフ・キャッチコピーをAIが自動生成し、プレースホルダーのデフォルトテキストとして記述する（例: {{TEXT_1:はぁとを1位にしてくれ〜☆}}）。
    - 長々とした解説文は避け、キャッチコピーを大きくスタイリッシュに魅せる構成にする。
 5. **必須エンディング**: 最終ページ末尾に必ず「総選挙での投票を促す一文」と、小さく目立たない色の「#しゅがーはぁとを心デレラに」を配置。
 6. **CSS装飾**: 最終出力はpng画像になるため、アニメーションは不要。絵文字は使わず洗練されたデザインにすること。body { margin:0; padding:0; } を必ず設定。
@@ -217,6 +217,7 @@
         var isText=id.indexOf('text-')===0;
         ST[id]={x:0,y:0,r:0,s:1,fs:100};
         if(window.getComputedStyle(el).position==='static')el.style.position='relative';
+        if(isText)el.style.zIndex='100';
         var rh=document.createElement('span');
         rh.className='dm-rh';rh.textContent='↻';el.appendChild(rh);
 
@@ -515,9 +516,15 @@
       // ── API呼び出し ──
       // ── HTMLからテキストを自動抽出して{{TEXT_n}}プレースホルダーに変換 ──
       // AIが{{TEXT_n}}を使わなかった場合でもテキスト編集パネルを表示できる
-      // processHtmlFromAI: HTMLは変更しない
-      // テキスト抽出はiframeロード後にsetupIframe内で行う（HTML改変による破壊を防ぐ）
-      const processHtmlFromAI=(html)=>({html,texts:{}});
+      // {{TEXT_n:デフォルトテキスト}} 形式からデフォルト値を抽出して {{TEXT_n}} に正規化
+      const processHtmlFromAI=(html)=>{
+        const texts={};
+        const processed=html.replace(/\{\{TEXT_(\d+):([^}]*)\}\}/g,(_,id,def)=>{
+          texts[id]=def.trim();
+          return '{{TEXT_'+id+'}}';
+        });
+        return {html:processed,texts};
+      };
 
       const callApi=async(system,messages)=>{
         const res=await fetch("/api/claude",{
@@ -910,28 +917,6 @@
 
       const previewPanel=(
         <div style={{background:"#e5e5e5",display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 12px 6px",gap:"5px",...(isMobile?{flex:1,overflow:"hidden"}:{flex:1,overflow:"hidden"})}}>
-
-          {/* テキスト直接編集ボタン（スマホ用・iframe不要・確実に動く） */}
-          {(textIds.length>0||Object.keys(autoTexts).length>0)&&(
-            <div style={{display:"flex",gap:"6px",flexWrap:"wrap",justifyContent:"center",flexShrink:0}}>
-              {textIds.length>0
-                ? textIds.map(id=>(
-                    <button key={id}
-                      onClick={()=>setEditModal({id:'text-'+id,num:id,text:textVals[id]||"",fs:trans['text-'+id]?.fs||100})}
-                      style={{padding:"5px 13px",background:C.dark,color:C.white,border:"none",borderRadius:"20px",fontSize:"0.78rem",fontWeight:"bold",cursor:"pointer",fontFamily:FONT,boxShadow:"0 2px 8px rgba(212,128,147,0.4)"}}>
-                      ✎ テキスト{id}を編集
-                    </button>
-                  ))
-                : Object.keys(autoTexts).sort((a,b)=>+a-+b).map(num=>(
-                    <button key={num}
-                      onClick={()=>setEditModal({id:'text-'+num,num,text:autoTexts[num]||"",fs:trans['text-'+num]?.fs||100})}
-                      style={{padding:"5px 13px",background:C.dark,color:C.white,border:"none",borderRadius:"20px",fontSize:"0.78rem",fontWeight:"bold",cursor:"pointer",fontFamily:FONT,boxShadow:"0 2px 8px rgba(212,128,147,0.4)"}}>
-                      ✎ テキスト{num}を編集
-                    </button>
-                  ))
-              }
-            </div>
-          )}
 
           <div style={{fontSize:"0.68rem",color:"#aaa",flexShrink:0,textAlign:"center"}}>
             ドラッグ移動 / ↻ 回転
