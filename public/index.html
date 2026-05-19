@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <!-- maximum-scale=1.0 でスマホの自動ズームを防止 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>佐藤心 ダイマ作成AI 🌸</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif; -webkit-text-size-adjust: 100%; }
+    input[type="color"] { -webkit-appearance: none; border: 2px solid #E8B4C0; width: 44px; height: 36px; padding: 2px; cursor: pointer; border-radius: 8px; background: none; }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
+    input[type="range"] { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px; outline: none; background: #F0D0D8; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #D48093; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+    select { -webkit-appearance: none; appearance: none; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #E8B4C0; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+    // ══════════════════════════════════════════════
+    // 定数
+    // ══════════════════════════════════════════════
+    const CORRECT_PIN = "0722";
+
+    const MB = "https://nagomi-sugarheart.github.io/SugarHeartDB/Mobamas/";
+    const DB = "https://nagomi-sugarheart.github.io/SugarHeartDB/Deresute/";
+    const T = (full, trans, puchi) => {
+      const r = [];
+      if (full)  r.push({ id:"full",  label:"フル画像",  url:full  });
+      if (trans) r.push({ id:"trans", label:"背景透過",  url:trans });
+      if (puchi) r.push({ id:"puchi", label:"ぷちでれら", url:puchi });
+      return r;
+    };
+    const IMAGE_LIBRARY = [
+      { id:"mobamaster", label:"モバマス", icon:"📱", sets:[
+        { id:"mb01", label:"佐藤心",                   icon:"💗", types:T(MB+"SatoShin/SatoShin.jpg",MB+"SatoShin/SatoShinTouka.png","") },
+        { id:"mb02", label:"佐藤心+",                  icon:"💗", types:T(MB+"SatoShin+/SatoShin+.jpg",MB+"SatoShin+/SatoShin+Touka.png","") },
+        { id:"mb03", label:"[T.B.ｽｳｨｰﾃｨｰ]佐藤心",     icon:"💗", types:T(MB+"TBSweetie/TBSweetie.jpg","","") },
+        { id:"mb04", label:"[T.B.ｽｳｨｰﾃｨｰ]佐藤心+",    icon:"💗", types:T(MB+"TBSweetie+/TBSweetie+.jpg","","") },
+        { id:"mb05", label:"[ﾈｸｽﾄｽﾀｰI.C]佐藤心+",     icon:"💗", types:T(MB+"NextStarIC+/NextStarIC+.jpg",MB+"NextStarIC+/NextStarIC+Touka.png","") },
+        { id:"mb06", label:"[ﾊｰﾄ･ﾓﾃﾞﾙ]佐藤心",         icon:"💗", types:T(MB+"HeartModel/HeartModelWakuNashi.jpg",MB+"HeartModel/HeartModelTouka.png","") },
+        { id:"mb07", label:"[ﾊｰﾄ･ﾓﾃﾞﾙ]佐藤心+",        icon:"💗", types:T(MB+"HeartModel+/HeartModel+WakuNashi.jpg",MB+"HeartModel+/HeartModel+Touka.png","") },
+        { id:"mb08", label:"[ﾊｰﾄ･ﾓﾃﾞﾙ･S]佐藤心",       icon:"💗", types:T(MB+"HeartModel/HeartModelSWakuNashi.jpg",MB+"HeartModel/HeartModelSTouka.png","") },
+        { id:"mb09", label:"[ﾊｰﾄ･ﾓﾃﾞﾙ･S]佐藤心+",      icon:"💗", types:T(MB+"HeartModel+/HeartModelS+WakuNashi.jpg",MB+"HeartModel+/HeartModelS+Touka.png","") },
+        { id:"mb10", label:"[えんじぇるはぁと]佐藤心",   icon:"💗", types:T(MB+"AngelHeart/AngelHeartWakuNashi.jpg","","") },
+        { id:"mb11", label:"[えんじぇるはぁと]佐藤心+",  icon:"💗", types:T(MB+"AngelHeart+/AngelHeart+WakuNashi.jpg",MB+"AngelHeart+/AngelHeart+Touka.png","") },
+        { id:"mb12", label:"[はぁとの嫁入り]佐藤心",     icon:"💗", types:T(MB+"HeartNoYomeiri/HeartNoYomeiriWakuNashi.jpg","","") },
+        { id:"mb13", label:"[はぁとの嫁入り]佐藤心+",    icon:"💗", types:T(MB+"HeartNoYomeiri+/HeartNoYomeiri+WakuNashi.jpg","","") },
+        { id:"mb14", label:"[ｽｳｨｰﾃｨｰ･ﾛﾜｲﾔﾙ]佐藤心",    icon:"💗", types:T(MB+"SweetieRoyal/SweetieRoyalWakuNashi.jpg","","") },
+        { id:"mb15", label:"[ｽｳｨｰﾃｨｰ･ﾛﾜｲﾔﾙ]佐藤心+",   icon:"💗", types:T(MB+"SweetieRoyal+/SweetieRoyal+WakuNashi.jpg","","") },
+        { id:"mb16", label:"[ﾜｰｷﾝｸﾞ･ｽｳｨｰﾃｨｰ]佐藤心",   icon:"💗", types:T(MB+"WorkingSweetie/WorkingSweetie.jpg","","") },
+        { id:"mb17", label:"[ﾜｰｷﾝｸﾞ･ｽｳｨｰﾃｨｰ]佐藤心+",  icon:"💗", types:T(MB+"WorkingSweetie+/WorkingSweetie+.jpg","","") },
+        { id:"mb18", label:"[常夏ﾊﾟﾗﾀﾞｲｽ]佐藤心",       icon:"💗", types:T(MB+"TokonatsuParadise/TokonatsuParadiseWakuNashi.jpg","","") },
+        { id:"mb19", label:"[常夏ﾊﾟﾗﾀﾞｲｽ]佐藤心+",      icon:"💗", types:T(MB+"TokonatsuParadise+/TokonatsuParadise+WakuNashi.jpg","","") },
+        { id:"mb20", label:"[ﾁｸｯとｽｳｨｰﾃｨｰ]佐藤心",     icon:"💗", types:T(MB+"ChikuttoSweetie/ChikuttoSweetie.jpg","","") },
+        { id:"mb21", label:"[ﾁｸｯとｽｳｨｰﾃｨｰ]佐藤心+",    icon:"💗", types:T(MB+"ChikuttoSweetie+/ChikuttoSweetie+.jpg",MB+"ChikuttoSweetie+/ChikuttoSweetie+Touka.png","") },
+        { id:"mb22", label:"[6thｱﾆﾊﾞｰｻﾘｰ]佐藤心",      icon:"💗", types:T(MB+"6thAnniversary/6thAnniversaryWakuNashi.jpg","","") },
+        { id:"mb23", label:"[6thｱﾆﾊﾞｰｻﾘｰ]佐藤心+",     icon:"💗", types:T(MB+"6thAnniversary+/6thAnniversary+WakuNashi.jpg","","") },
+        { id:"mb24", label:"[6thｱﾆﾊﾞｰｻﾘｰ･S]佐藤心",    icon:"💗", types:T(MB+"6thAnniversary/6thAnniversarySWakuNashi.jpg","","") },
+        { id:"mb25", label:"[6thｱﾆﾊﾞｰｻﾘｰ･S]佐藤心+",   icon:"💗", types:T(MB+"6thAnniversary+/6thAnniversaryS+WakuNashi.jpg","","") },
+        { id:"mb26", label:"[ふぉーりんはぁと]佐藤心",   icon:"💗", types:T(MB+"FallingHeart/FallingHeartWakuNashi.jpg",MB+"FallingHeart/FallingHeartTouka.png","") },
+        { id:"mb27", label:"[ふぉーりんはぁと]佐藤心+",  icon:"💗", types:T(MB+"FallingHeart+/FallingHeart+WakuNashi.jpg",MB+"FallingHeart+/FallingHeart+Touka.png","") },
+        { id:"mb28", label:"[新春はぁとふる]佐藤心",     icon:"💗", types:T(MB+"ShinshunHeartful/ShinshunHeartfulWakuNashi.jpg",MB+"ShinshunHeartful/ShinshunHeartfulTouka.png","") },
+        { id:"mb29", label:"[新春はぁとふる]佐藤心+",    icon:"💗", types:T(MB+"ShinshunHeartful+/ShinshunHeartful+WakuNashi.jpg",MB+"ShinshunHeartful+/ShinshunHeartful+Touka.png","") },
+        { id:"mb30", label:"[夏色はぁと]佐藤心",         icon:"💗", types:T(MB+"NatsuiroHeart/NatsuiroHeartWakuNashi.jpg",MB+"NatsuiroHeart/NatsuiroHeartTouka.png","") },
+        { id:"mb31", label:"[夏色はぁと]佐藤心+",        icon:"💗", types:T(MB+"NatsuiroHeart+/NatsuiroHeart+WakuNashi.jpg",MB+"NatsuiroHeart+/NatsuiroHeart+Touka.png","") },
+        { id:"mb32", label:"[ｽｳｨｰﾃｨｰ･ﾆｭｰｲﾔｰ]佐藤心",   icon:"💗", types:T(MB+"SweetieNewYear/SweetieNewYearWakuNashi.jpg",MB+"SweetieNewYear/SweetieNewYearTouka.png","") },
+        { id:"mb33", label:"[ｽｳｨｰﾃｨｰ･ﾆｭｰｲﾔｰ]佐藤心+",  icon:"💗", types:T(MB+"SweetieNewYear+/SweetieNewYear+WakuNashi.jpg",MB+"SweetieNewYear+/SweetieNewYear+Touka.png","") },
+        { id:"mb34", label:"[ﾒﾘｸﾘ☆ﾊｰﾄ]佐藤心",         icon:"💗", types:T(MB+"MerryChristmasHeart/MerryChristmasHeartWakuNashi.jpg",MB+"MerryChristmasHeart/MerryChristmasHeartTouka.png","") },
+        { id:"mb35", label:"[ﾒﾘｸﾘ☆ﾊｰﾄ]佐藤心+",        icon:"💗", types:T(MB+"MerryChristmasHeart+/MerryChristmasHeart+WakuNashi.jpg",MB+"MerryChristmasHeart+/MerryChristmasHeart+Touka.png","") },
+        { id:"mb36", label:"[ﾌﾞﾘﾘｱﾝﾄ･はぁと]佐藤心",    icon:"💗", types:T(MB+"BrilliantHeart/BrilliantHeartWakuNashi.jpg",MB+"BrilliantHeart/BrilliantHeartTouka.png","") },
+        { id:"mb37", label:"[ﾌﾞﾘﾘｱﾝﾄ･はぁと]佐藤心+",   icon:"💗", types:T(MB+"BrilliantHeart+/BrilliantHeart+WakuNashi.jpg",MB+"BrilliantHeart+/BrilliantHeart+Touka.png","") },
+        { id:"mb38", label:"[ｽﾀｲﾘｯｼｭ･はぁと]佐藤心",    icon:"💗", types:T(MB+"StylishHeart/StylishHeartWakuNashi.jpg",MB+"StylishHeart/StylishHeartTouka.png","") },
+        { id:"mb39", label:"[ｽﾀｲﾘｯｼｭ･はぁと]佐藤心+",   icon:"💗", types:T(MB+"StylishHeart+/StylishHeart+WakuNashi.jpg",MB+"StylishHeart+/StylishHeart+Touka.png","") },
+      ]},
+      { id:"dereste", label:"デレステ", icon:"🎮", sets:[
+        { id:"ds01", label:"佐藤心",                          icon:"💗", types:T(DB+"SatoShin/SatoShin.jpg",DB+"SatoShin/SatoShinTouka.png",DB+"SatoShin/SatoShinPuchiDerela.png") },
+        { id:"ds02", label:"佐藤心+",                         icon:"💗", types:T(DB+"SatoShin+/SatoShin+.jpg",DB+"SatoShin+/SatoShin+Touka.png",DB+"SatoShin+/SatoShin+PuchiDerela.png") },
+        { id:"ds03", label:"[ハート・モデル]佐藤心",            icon:"💗", types:T(DB+"HeartModel/HeartModel.jpg",DB+"HeartModel/HeartModelTouka.png",DB+"HeartModel/HeartModelPuchiDerela.png") },
+        { id:"ds04", label:"[ハート・モデル]佐藤心+",           icon:"💗", types:T(DB+"HeartModel+/HeartModel+.jpg",DB+"HeartModel+/HeartModel+Touka.png",DB+"HeartModel+/HeartModel+PuchiDerela.png") },
+        { id:"ds05", label:"[はぁと・トゥ・ハート]佐藤心",       icon:"💗", types:T(DB+"HeartToHeart/HeartToHeartCard.jpg",DB+"HeartToHeart/HeartToHeartTouka.png",DB+"HeartToHeart/HeartToHeartPuchiDerela.png") },
+        { id:"ds06", label:"[はぁと・トゥ・ハート]佐藤心+",      icon:"💗", types:T(DB+"HeartToHeart+/HeartToHeart+.jpg",DB+"HeartToHeart+/HeartToHeart+Touka.png",DB+"HeartToHeart+/HeartToHeart+PuchiDerela.png") },
+        { id:"ds07", label:"[はぁとの嫁入り]佐藤心",            icon:"💗", types:T(DB+"HeartNoYomeiri/HeartNoYomeiri.jpg",DB+"HeartNoYomeiri/HeartNoYomeiriTouka.png",DB+"HeartNoYomeiri/HeartNoYomeiriPuchiDerela.png") },
+        { id:"ds08", label:"[はぁとの嫁入り]佐藤心+",           icon:"💗", types:T(DB+"HeartNoYomeiri+/HeartNoYomeiri+.jpg",DB+"HeartNoYomeiri+/HeartNoYomeiri+Touka.png",DB+"HeartNoYomeiri+/HeartNoYomeiri+PuchiDerela.png") },
+        { id:"ds09", label:"[ブリリアント・はぁと]佐藤心",       icon:"💗", types:T(DB+"BrilliantHeart/BrilliantHeart.jpg",DB+"BrilliantHeart/BrilliantHeartTouka.png",DB+"BrilliantHeart/BrilliantHeartPuchiDerela.png") },
+        { id:"ds10", label:"[ブリリアント・はぁと]佐藤心+",      icon:"💗", types:T(DB+"BrilliantHeart+/BrilliantHeart+.jpg",DB+"BrilliantHeart+/BrilliantHeart+Touka.png",DB+"BrilliantHeart+/BrilliantHeart+PuchiDerela.png") },
+        { id:"ds11", label:"[Happy・New・Yeah!]佐藤心",         icon:"💗", types:T(DB+"HappyNewYeah/HappyNewYeah.jpg",DB+"HappyNewYeah/HappyNewYeahTouka.png",DB+"HappyNewYeah/HappyNewYeahPuchiDerela.png") },
+        { id:"ds12", label:"[Happy・New・Yeah!]佐藤心+",        icon:"💗", types:T(DB+"HappyNewYeah+/HappyNewYeah+.jpg",DB+"HappyNewYeah+/HappyNewYeah+Touka.png",DB+"HappyNewYeah+/HappyNewYeah+PuchiDerela.png") },
+        { id:"ds13", label:"[凸凹スピードスター]佐藤心",          icon:"💗", types:T(DB+"DekobokoSpeedStar/DekobokoSpeedStar.jpg",DB+"DekobokoSpeedStar/DekobokoSpeedStarTouka.png",DB+"DekobokoSpeedStar/DekobokoSpeedStarPuchiDerela.png") },
+        { id:"ds14", label:"[凸凹スピードスター]佐藤心+",         icon:"💗", types:T(DB+"DekobokoSpeedStar+/DekobokoSpeedStar+.jpg",DB+"DekobokoSpeedStar+/DekobokoSpeedStar+Touka.png",DB+"DekobokoSpeedStar+/DekobokoSpeedStar+PuchiDerela.png") },
+        { id:"ds15", label:"[オーダーメイド・はぁと]佐藤心",      icon:"💗", types:T(DB+"OrderMadeHeart/OrderMadeHeart.jpg",DB+"OrderMadeHeart/OrderMadeHeartTouka.png",DB+"OrderMadeHeart/OrderMadeHeartPuchiDerela.png") },
+        { id:"ds16", label:"[オーダーメイド・はぁと]佐藤心+",     icon:"💗", types:T(DB+"OrderMadeHeart+/OrderMadeHeart+.jpg",DB+"OrderMadeHeart+/OrderMadeHeart+Touka.png",DB+"OrderMadeHeart+/OrderMadeHeart+PuchiDerela.png") },
+        { id:"ds17", label:"[ラグジュアリィ・はぁと]佐藤心",      icon:"💗", types:T(DB+"LuxuryHeart/LuxuryHeart.jpg",DB+"LuxuryHeart/LuxuryHeartTouka.png",DB+"LuxuryHeart/LuxuryHeartPuchiDerela.png") },
+        { id:"ds18", label:"[ラグジュアリィ・はぁと]佐藤心+",     icon:"💗", types:T(DB+"LuxuryHeart+/LuxuryHeart+.jpg",DB+"LuxuryHeart+/LuxuryHeart+Touka.png",DB+"LuxuryHeart+/LuxuryHeart+PuchiDerela.png") },
+        { id:"ds19", label:"[Go Just Go!]佐藤心",               icon:"💗", types:T(DB+"GoJustGo/GoJustGo.jpg",DB+"GoJustGo/GoJustGoTouka.png",DB+"GoJustGo/GoJustGoPuchiDerela.png") },
+        { id:"ds20", label:"[Go Just Go!]佐藤心+",              icon:"💗", types:T(DB+"GoJustGo+/GoJustGo+.jpg",DB+"GoJustGo+/GoJustGo+Touka.png",DB+"GoJustGo+/GoJustGo+PuchiDerela.png") },
+        { id:"ds21", label:"[躍るFlagship]佐藤心",               icon:"💗", types:T(DB+"OdoruFlagship/OdoruFlagship.jpg",DB+"OdoruFlagship/OdoruFlagshipTouka.png",DB+"OdoruFlagship/OdoruFlagshipPuchiDerela.png") },
+        { id:"ds22", label:"[躍るFlagship]佐藤心+",              icon:"💗", types:T(DB+"OdoruFlagship+/OdoruFlagship+.jpg",DB+"OdoruFlagship+/OdoruFlagship+Touka.png",DB+"OdoruFlagship+/OdoruFlagship+PuchiDerela.png") },
+        { id:"ds23", label:"[はぁとふる☆sweeteen]佐藤心",        icon:"💗", types:T(DB+"HeartfulSweeteen/HeartfulSweeteen.jpg",DB+"HeartfulSweeteen/HeartfulSweeteenTouka.png",DB+"HeartfulSweeteen/HeartfulSweeteenPuchiDerela.png") },
+        { id:"ds24", label:"[はぁとふる☆sweeteen]佐藤心+",       icon:"💗", types:T(DB+"HeartfulSweeteen+/HeartfulSweeteen+.jpg",DB+"HeartfulSweeteen+/HeartfulSweeteen+Touka.png",DB+"HeartfulSweeteen+/HeartfulSweeteen+PuchiDerela.png") },
+        { id:"ds25", label:"[CoCo夏夏夏Holiday]佐藤心",          icon:"💗", types:T(DB+"CoCoNatsuNatsuNatsuHoliday/CoCoNatsuNatsuNatsuHoliday.jpg",DB+"CoCoNatsuNatsuNatsuHoliday/CoCoNatsuNatsuNatsuHolidayTouka.png",DB+"CoCoNatsuNatsuNatsuHoliday/CoCoNatsuNatsuNatsuHolidayPuchiDerela.png") },
+        { id:"ds26", label:"[CoCo夏夏夏Holiday]佐藤心+",         icon:"💗", types:T(DB+"CoCoNatsuNatsuNatsuHoliday+/CoCoNatsuNatsuNatsuHoliday+.jpg",DB+"CoCoNatsuNatsuNatsuHoliday+/CoCoNatsuNatsuNatsuHoliday+Touka.png",DB+"CoCoNatsuNatsuNatsuHoliday+/CoCoNatsuNatsuNatsuHoliday+PuchiDerela.png") },
+        { id:"ds27", label:"[恋するスウィーティーサマー]佐藤心",  icon:"💗", types:T(DB+"KoisuruSweetieSummer/KoisuruSweetieSummer.jpg",DB+"KoisuruSweetieSummer/KoisuruSweetieSummerTouka.png",DB+"KoisuruSweetieSummer/KoisuruSweetieSummerPuchiDerela.png") },
+        { id:"ds28", label:"[恋するスウィーティーサマー]佐藤心+", icon:"💗", types:T(DB+"KoisuruSweetieSummer+/KoisuruSweetieSummer+.jpg",DB+"KoisuruSweetieSummer+/KoisuruSweetieSummer+Touka.png",DB+"KoisuruSweetieSummer+/KoisuruSweetieSummer+PuchiDerela.png") },
+        { id:"ds29", label:"[ダンシング・デッド]佐藤心",           icon:"💗", types:T(DB+"DancingDead/DancingDead.jpg",DB+"DancingDead/DancingDeadTouka.png",DB+"DancingDead/DancingDeadPuchiDerela.png") },
+        { id:"ds30", label:"[ダンシング・デッド]佐藤心+",          icon:"💗", types:T(DB+"DancingDead+/DancingDead+.jpg",DB+"DancingDead+/DancingDead+Touka.png",DB+"DancingDead+/DancingDead+PuchiDerela.png") },
+        { id:"ds31", label:"[愛されクイーン・はぁと]佐藤心",       icon:"💗", types:T(DB+"AisareQueenHeart/AisareQueenHeart.jpg",DB+"AisareQueenHeart/AisareQueenHeartTouka.png",DB+"AisareQueenHeart/AisareQueenHeartPuchiDerela.png") },
+        { id:"ds32", label:"[愛されクイーン・はぁと]佐藤心+",      icon:"💗", types:T(DB+"AisareQueenHeart+/AisareQueenHeart+.jpg",DB+"AisareQueenHeart+/AisareQueenHeart+Touka.png",DB+"AisareQueenHeart+/AisareQueenHeart+PuchiDerela.png") },
+        { id:"ds33", label:"[ド根性☆レポーター]佐藤心",            icon:"💗", types:T(DB+"DokonjyoReporter/DokonjyoReporter.jpg",DB+"DokonjyoReporter/DokonjyoReporterTouka.png",DB+"DokonjyoReporter/DokonjyoReporterPuchiDerela.png") },
+        { id:"ds34", label:"[ド根性☆レポーター]佐藤心+",           icon:"💗", types:T(DB+"DokonjyoReporter+/DokonjyoReporter+.jpg",DB+"DokonjyoReporter+/DokonjyoReporter+Touka.png",DB+"DokonjyoReporter+/DokonjyoReporter+PuchiDerela.png") },
+        { id:"ds35", label:"[真夏の☆はぁとミーツハート]佐藤心",    icon:"💗", types:T(DB+"ManatsuNoHeartMeetsHeart/ManatsuNoHeartMeetsHeart.jpg",DB+"ManatsuNoHeartMeetsHeart/ManatsuNoHeartMeetsHeartTouka.png",DB+"ManatsuNoHeartMeetsHeart/ManatsuNoHeartMeetsHeartPuchiDerela.png") },
+        { id:"ds36", label:"[真夏の☆はぁとミーツハート]佐藤心+",   icon:"💗", types:T(DB+"ManatsuNoHeartMeetsHeart+/ManatsuNoHeartMeetsHeart+.jpg",DB+"ManatsuNoHeartMeetsHeart+/ManatsuNoHeartMeetsHeart+Touka.png",DB+"ManatsuNoHeartMeetsHeart+/ManatsuNoHeartMeetsHeart+PuchiDerela.png") },
+        { id:"ds37", label:"[この世でただひとりのはぁと]佐藤心",    icon:"💗", types:T(DB+"KonoyoDeTadaHitoriNoHeart/KonoyoDeTadaHitoriNoHeart.jpg",DB+"KonoyoDeTadaHitoriNoHeart/KonoyoDeTadaHitoriNoHeartTouka.png",DB+"KonoyoDeTadaHitoriNoHeart/KonoyoDeTadaHitoriNoHeartPuchiDerela.png") },
+        { id:"ds38", label:"[この世でただひとりのはぁと]佐藤心+",   icon:"💗", types:T(DB+"KonoyoDeTadaHitoriNoHeart+/KonoyoDeTadaHitoriNoHeart+.jpg",DB+"KonoyoDeTadaHitoriNoHeart+/KonoyoDeTadaHitoriNoHeart+Touka.png",DB+"KonoyoDeTadaHitoriNoHeart+/KonoyoDeTadaHitoriNoHeart+PuchiDerela.png") },
+      ]},
+    ];
+
+    const fallbackSvg = (id) => {
+      const s = `<svg xmlns="http://www.w3.org/2000/svg" width="450" height="800"><rect width="450" height="800" fill="#FFD6DC"/><text x="225" y="380" font-family="sans-serif" font-size="60" text-anchor="middle">📸</text><text x="225" y="450" font-family="sans-serif" font-size="20" fill="rgba(180,80,100,0.8)" text-anchor="middle">画像 ${id}</text></svg>`;
+      return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(s);
+    };
+
+    // ── システムプロンプトテンプレート（添付txtをベースに最適化） ──
+    const SYSTEM_PROMPT_TEMPLATE = `# 役割 (Role)
+あなたは「アイドルマスター シンデレラガールズ」のアイドルの魅力を世界一引き出せるプロフェッショナルなWebデザイナー兼システムエンジニアです。UI/UXの深い知識を持ち、対象アイドルの個性を最大化した、スマートフォンスクリーン用応援画像（フライヤー）をHTML/CSSで構築します。
+
+# コンテキスト：対象アイドル「佐藤心（さとうしん）」のプロフィール
+* 通称: しゅがは、しゅがーはぁと
+* 年齢: 26歳（崖っぷちを自負しつつも牙城を崩さないガッツがある）
+* ビジュアル/テーマ: 「スウィーティー」「はぁと」「メルヘン＆ポップ」
+* 特徴: 衣装は基本的に手作り。リボン、ハート、星、キャンディ、フリルなどのモチーフを多用。
+* 口調/トンマナ: 「〜☆」「〜だぞ」「〜しちゃって！」などキャッチーでテンションが高い。時折26歳のリアルな本音やプロデューサーへの深い信頼が垣間見える。
+* 【重要】幼い頃からアイドルを目指し、ようやくアイドルになれた。夢はトップアイドル。
+
+# ユーザーからの入力データ (Input Data)
+* 出力枚数（ページ数）: {{PAGE_COUNT}}枚 (1〜4枚)
+* デザインテーマ: {{THEME}}
+* レイアウトの方向性: {{LAYOUT_DIR}}
+* メインカラー: {{MAIN_COLOR}}
+* 掲載したい特定のセリフ/テキスト: {{TEXT_CONTENT}}
+* その他の要望: {{ADDITIONAL_REQUEST}}
+
+# デザインおよびコーディング制約 (Strict Constraints)
+1. **配色**: 毒々しい色・ネオンカラー厳禁。プロが作ったような洗練されたトーンに調整。「おまかせ」の場合はスウィーティーピンクをベースにホワイト・パステルカラーを組み合わせた配色にすること。
+2. **構造とアスペクト比・はみ出し厳禁**:
+   - 各ページは縦長スマホ表示（max-width:360px, aspect-ratio:9/16）で作成すること。
+   - bodyには必ず display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; padding:0; overflow-x:hidden; を設定すること。
+   - **【最重要】フライヤー本体の最外郭コンテナには必ず overflow:hidden; position:relative; box-sizing:border-box; width:100%; max-width:360px; aspect-ratio:9/16; を設定すること（はみ出しを完全カット）**
+   - position:absoluteで配置する装飾・要素は、コンテナ外に絶対に出ないこと。top/left/right/bottomの値は0%〜100%の範囲内に収めること。
+   - テキストには white-space:nowrap を使わず、overflow:hidden または word-break:break-all を設定すること。
+   - 複数枚の場合は各ページを独立した縦長スクリーンとして構成し、ページ間に ✂---CUT---✂ などの切り取り線を実装。
+3. **画像配置**:
+   - background-imageは絶対に使用しない。必ず<img>タグを使用する。
+   - <img>タグのsrc属性には必ず {{IMAGE_1}}, {{IMAGE_2}} などのプレースホルダーを使用する。
+   - <img>タグの直前に <!-- ここで画像を書き換える --> コメントを挿入する。
+   - <img>タグには必ず width:100%; height:100%; object-fit:cover; object-position:center; を設定する。
+4. **テキスト**:
+   - テキストを入れる箇所は {{TEXT_1}}, {{TEXT_2}} などのプレースホルダーを使用する。
+   - TEXT_CONTENTが「おまかせ」の場合は佐藤心らしいセリフ・キャッチコピーをAIが自動生成しプレースホルダーに入れる。
+   - 長々とした解説文は避け、キャッチコピーを大きくスタイリッシュに魅せる構成にする。
+5. **必須エンディング**: 最終ページ末尾に必ず「総選挙での投票を促す一文」と、小さく目立たない色の「#しゅがーはぁとを心デレラに」を配置。
+6. **CSS装飾**: 最終出力はpng画像になるため、アニメーションは不要。絵文字は使わず洗練されたデザインにすること。body { margin:0; padding:0; } を必ず設定。
+
+# システム出力ルール
+* HTMLコード（\`\`\`htmlブロック）のみを出力。解説文・挨拶文・マークダウン説明は一切含めない。
+* <!DOCTYPE html>から始まり、<style>内に全CSSを含む単一ファイル構成。`;
+
+    // ── iframeインタラクション ──
+    const INTERACTION_CSS = `
+      [data-daima]{
+        cursor:move!important;user-select:none!important;-webkit-user-select:none!important;
+        touch-action:manipulation!important; /* ダブルタップズーム防止 */
+      }
+      [data-daima][data-daima^="text-"]{cursor:pointer!important;}
+      [data-daima]:hover{outline:2px dashed rgba(232,180,192,0.85)!important;outline-offset:4px!important}
+      [data-daima].dm-sel{outline:2px solid rgba(212,128,147,1)!important;outline-offset:4px!important}
+      .dm-rh{position:absolute!important;width:22px!important;height:22px!important;top:-26px!important;right:-26px!important;background:#D48093!important;border:2.5px solid white!important;border-radius:50%!important;cursor:crosshair!important;font-size:12px!important;display:flex!important;align-items:center!important;justify-content:center!important;box-shadow:0 2px 8px rgba(0,0,0,0.35)!important;z-index:99999!important;color:white!important;opacity:0!important;transition:opacity 0.18s!important;line-height:1!important}
+      [data-daima]:hover .dm-rh,[data-daima].dm-sel .dm-rh{opacity:1!important}
+      [data-daima^="text-"]::after{content:'✎';position:absolute!important;bottom:-22px!important;left:50%!important;transform:translateX(-50%)!important;font-size:13px!important;background:#E8B4C0!important;color:white!important;border-radius:10px!important;padding:1px 7px!important;opacity:0!important;transition:opacity 0.18s!important;white-space:nowrap!important;font-style:normal!important;pointer-events:none!important;z-index:99998!important;}
+      [data-daima^="text-"]:hover::after,[data-daima^="text-"].dm-sel::after{opacity:1!important;}
+    `;
+
+    // タップでモーダルを開く版（contenteditable廃止）
+    const INTERACTION_JS = `(function(){
+      const ST={};
+      window.daimaSet=function(ts){
+        Object.entries(ts).forEach(function(entry){
+          var id=entry[0],t=entry[1];
+          ST[id]=Object.assign({x:0,y:0,r:0,s:1,fs:100},ST[id],t);
+          var el=document.querySelector('[data-daima="'+id+'"]');
+          if(el)applyT(el,ST[id]);
+        });
+      };
+      function applyT(el,t){
+        el.style.transform='translate('+t.x+'px,'+t.y+'px) rotate('+t.r+'deg) scale('+(t.s||1)+')';
+        if(t.fs!==undefined&&t.fs!==100){el.style.fontSize=t.fs+'%';}
+        else{el.style.fontSize='';}
+      }
+      function notify(id){window.parent.postMessage({type:'dm-t',id:id,t:ST[id]},'*');}
+      function notifyTap(id,text){window.parent.postMessage({type:'dm-tap',id:id,text:text},'*');}
+
+      document.querySelectorAll('[data-daima]').forEach(function(el){
+        var id=el.getAttribute('data-daima');
+        var isText=id.indexOf('text-')===0;
+        ST[id]={x:0,y:0,r:0,s:1,fs:100};
+        if(window.getComputedStyle(el).position==='static')el.style.position='relative';
+        var rh=document.createElement('span');
+        rh.className='dm-rh';rh.textContent='↻';el.appendChild(rh);
+
+        var mode=null,sx,sy,st,sa,moved;
+        function gc(){var r=el.getBoundingClientRect();return{cx:r.left+r.width/2,cy:r.top+r.height/2};}
+        function mv(cx,cy){
+          if(!mode)return;
+          var dx=cx-sx,dy=cy-sy;
+          if(Math.sqrt(dx*dx+dy*dy)>10)moved=true; // 10px以上動いたらドラッグ扱い
+          if(mode==='drag'){ST[id]={x:st.x+cx-sx,y:st.y+cy-sy,r:st.r,s:st.s||1,fs:st.fs||100};}
+          else{var c=gc();var a=Math.atan2(cy-c.cy,cx-c.cx)*180/Math.PI;ST[id]={x:st.x,y:st.y,r:st.r+(a-sa),s:st.s||1,fs:st.fs||100};}
+          applyT(el,ST[id]);
+        }
+        function end(){if(mode){if(!moved&&isText){notifyTap(id,el.innerText);}else{notify(id);}mode=null;}}
+
+        el.addEventListener('mousedown',function(e){
+          if(e.target===rh)return;
+          mode='drag';moved=false;sx=e.clientX;sy=e.clientY;st=Object.assign({},ST[id]);el.classList.add('dm-sel');e.preventDefault();e.stopPropagation();
+        });
+        rh.addEventListener('mousedown',function(e){
+          mode='rotate';moved=false;var c=gc();sa=Math.atan2(e.clientY-c.cy,e.clientX-c.cx)*180/Math.PI;st=Object.assign({},ST[id]);e.preventDefault();e.stopPropagation();
+        });
+        el.addEventListener('touchstart',function(e){
+          if(e.target===rh||e.touches.length!==1)return;
+          mode='drag';moved=false;sx=e.touches[0].clientX;sy=e.touches[0].clientY;st=Object.assign({},ST[id]);el.classList.add('dm-sel');e.preventDefault();
+        },{passive:false});
+        rh.addEventListener('touchstart',function(e){
+          if(e.touches.length!==1)return;
+          mode='rotate';moved=false;var c=gc();sa=Math.atan2(e.touches[0].clientY-c.cy,e.touches[0].clientX-c.cx)*180/Math.PI;st=Object.assign({},ST[id]);e.preventDefault();
+        },{passive:false});
+        document.addEventListener('mousemove',function(e){mv(e.clientX,e.clientY);});
+        document.addEventListener('mouseup',end);
+        document.addEventListener('touchmove',function(e){if(e.touches.length===1)mv(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+        document.addEventListener('touchend',end);
+      });
+      document.addEventListener('click',function(e){if(!e.target.closest('[data-daima]'))document.querySelectorAll('[data-daima]').forEach(function(el){el.classList.remove('dm-sel');});});
+    })();`;
+
+    // ── テーマ ──
+    const C = { pink:"#E8B4C0", dark:"#D48093", light:"#FFF0F3", mid:"#FDE8EC", white:"#FFFFFF", text:"#4a3e40", gray:"#999" };
+    const FONT = "'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN',sans-serif";
+    const inp  = { width:"100%", padding:"9px 12px", border:`1.5px solid ${C.pink}`, borderRadius:"10px", fontSize:"0.9rem", fontFamily:FONT, outline:"none", boxSizing:"border-box", color:C.text, background:C.white };
+    const SH   = { fontSize:"0.82rem", fontWeight:"bold", color:C.dark, borderBottom:`2px dashed ${C.pink}`, paddingBottom:"5px", marginBottom:"10px" };
+    const PB   = (on) => ({ background:on?`linear-gradient(135deg,${C.pink},${C.dark})`:"#e8e8e8", color:on?C.white:"#bbb", border:"none", borderRadius:"30px", fontWeight:"bold", cursor:on?"pointer":"not-allowed", transition:"all 0.2s", boxShadow:on?"0 4px 14px rgba(212,128,147,0.38)":"none" });
+    const SB   = (on) => ({ ...PB(on), borderRadius:"10px" });
+
+    // ══════════════════════════════════════════════
+    // メインコンポーネント
+    // ══════════════════════════════════════════════
+    function DaimaCreator() {
+      // Auth
+      const [auth,     setAuth]     = useState(false);
+      const [pin,      setPin]      = useState("");
+      const [pinErr,   setPinErr]   = useState(false);
+      const [pinShake, setPinShake] = useState(false);
+
+      // 構造化フォーム
+      const [pageCount,    setPageCount]    = useState("1");
+      const [designTheme,  setDesignTheme]  = useState("おまかせ");
+      const [layoutDir,    setLayoutDir]    = useState("バランス型");
+      const [mainColor,    setMainColor]    = useState("#E8B4C0");
+      const [subColor,     setSubColor]     = useState("#FFE066");
+      const [useAutoColor, setUseAutoColor] = useState(true);
+      const [textContent,  setTextContent]  = useState("");
+      const [addReq,       setAddReq]       = useState("");
+
+      // App
+      const [screen,   setScreen]   = useState("prompt");
+      const [chatHist, setChatHist] = useState([]);
+      const systemRef  = useRef(""); // 生成時のシステムプロンプトを記憶（修正依頼で再利用）
+      const [rawHtml,  setRawHtml]  = useState("");
+      const [textVals, setTextVals] = useState({});
+      const [imgUrls,  setImgUrls]  = useState({});
+      const [revise,   setRevise]   = useState("");
+      const [loading,  setLoading]  = useState(false);
+      const [loadMsg,  setLoadMsg]  = useState("");
+      const [error,    setError]    = useState("");
+      const [saving,   setSaving]   = useState(false);
+      const [trans,    setTrans]    = useState({});
+      const transRef   = useRef({});
+      useEffect(() => { transRef.current = trans; }, [trans]);
+      const [hiddenElems, setHiddenElems] = useState([]);
+      const hiddenRef  = useRef([]);
+      useEffect(() => { hiddenRef.current = hiddenElems; }, [hiddenElems]);
+      const [picNav,   setPicNav]   = useState({});
+      const [completedUrl, setCompletedUrl] = useState(null);
+      // テキスト編集モーダル {id:'text-1', num:'1', text:'...', fs:100}
+      const [editModal, setEditModal] = useState(null);
+      const textValsRef = useRef({});
+      useEffect(()=>{ textValsRef.current = textVals; },[textVals]);
+      // iframeから自動抽出したテキスト（rawHtml改変なし・直接DOM操作）
+      const [autoTexts, setAutoTexts] = useState({});
+      const autoTextsRef = useRef({});
+      useEffect(()=>{ autoTextsRef.current = autoTexts; },[autoTexts]);
+      const rawHtmlRef = useRef("");
+      useEffect(()=>{ rawHtmlRef.current = rawHtml; },[rawHtml]);
+
+      // UI
+      const [isMobile,  setIsMobile]  = useState(() => window.innerWidth < 680);
+      const [activeTab, setActiveTab] = useState("edit");
+      const iframeRef  = useRef(null);
+
+      useEffect(() => { const h=()=>setIsMobile(window.innerWidth<680); window.addEventListener("resize",h); return()=>window.removeEventListener("resize",h); }, []);
+
+      useEffect(() => {
+        const h=(e)=>{
+          if(e.data?.type==="dm-t"){ setTrans(p=>({...p,[e.data.id]:e.data.t})); return; }
+          // タップされたテキスト要素 → モーダルを開く
+          if(e.data?.type==="dm-tap"){
+            const num=e.data.id.replace("text-","");
+            setEditModal({
+              id: e.data.id,
+              num,
+              text: textValsRef.current[num] || e.data.text || "",
+              fs: transRef.current[e.data.id]?.fs || 100,
+            });
+            return;
+          }
+        };
+        window.addEventListener("message",h); return()=>window.removeEventListener("message",h);
+      }, []);
+
+      const textIds = useMemo(()=>[...new Set([...rawHtml.matchAll(/\{\{TEXT_(\d+)\}\}/g)].map(m=>m[1]))].sort((a,b)=>+a-+b),[rawHtml]);
+      const imgIds  = useMemo(()=>[...new Set([...rawHtml.matchAll(/\{\{IMAGE_(\d+)\}\}/g)].map(m=>m[1]))].sort((a,b)=>+a-+b),[rawHtml]);
+
+      useEffect(()=>{setTextVals(p=>Object.fromEntries(textIds.map(id=>[id,p[id]??""])));},[textIds.join(",")]); // eslint-disable-line
+      useEffect(()=>{setImgUrls(p=>Object.fromEntries(imgIds.map(id=>[id,p[id]??""])));},[imgIds.join(",")]); // eslint-disable-line
+
+      const baseHtml = useMemo(()=>{
+        if(!rawHtml)return"";
+        let html=rawHtml;
+        html=html.replace(/\{\{TEXT_(\d+)\}\}/g,(_,id)=>{
+          const v=textVals[id]||`<em style="color:#ccc;font-style:italic;font-size:0.82em">テキスト${id}</em>`;
+          return `<span data-daima="text-${id}" style="display:inline-block">${v}</span>`;
+        });
+        html=html.replace(/(<img[^>]*?)src=["']?\{\{IMAGE_(\d+)\}\}["']?([^>]*?>)/g,(_,bef,id,aft)=>
+          `${bef}src="${imgUrls[id]||fallbackSvg(id)}" data-daima="image-${id}"${aft}`
+        );
+        return html;
+      },[rawHtml,textVals,imgUrls]);
+
+      const [srcDoc,setSrcDoc]=useState("");
+      useEffect(()=>{
+        const t=setTimeout(()=>setSrcDoc(baseHtml),400);
+        return()=>clearTimeout(t);
+      },[baseHtml]);
+
+      const setupIframe=useCallback(()=>{
+        const iframe=iframeRef.current;
+        if(!iframe?.contentDocument?.body)return;
+        const doc=iframe.contentDocument;
+        const iw=iframe.contentWindow;
+        if(!doc.querySelector("#dm-css")){const s=doc.createElement("style");s.id="dm-css";s.textContent=INTERACTION_CSS;doc.head?.appendChild(s);}
+        if(!doc.querySelector("#dm-js")){const s=doc.createElement("script");s.id="dm-js";s.textContent=INTERACTION_JS;doc.body.appendChild(s);}
+        setTimeout(()=>{
+          if(iw?.daimaSet)iw.daimaSet(transRef.current);
+          hiddenRef.current.forEach(id=>{
+            const el=doc.querySelector(`[data-daima="${id}"]`);
+            if(el)el.style.display="none";
+          });
+
+          // ── iframeDOM から可視テキストを自動抽出（rawHtmlは変更しない） ──
+          // {{TEXT_n}}プレースホルダーがすでにある場合はスキップ
+          if(rawHtmlRef.current&&!/\{\{TEXT_\d+\}\}/.test(rawHtmlRef.current)){
+            const SKIP=new Set(['script','style','img','br','hr','input','select',
+                                'textarea','canvas','svg','path','noscript']);
+            const extracted={};
+            const seen=new Set(); // 同一テキストの重複防止
+            let counter=1;
+            Array.from(doc.body.querySelectorAll('*')).forEach(el=>{
+              if(SKIP.has(el.tagName.toLowerCase()))return;
+              if(el.closest('[data-daima]'))return; // 祖先が既タグ済み
+              // 計算済みスタイルで非表示チェック（最も正確）
+              try{
+                const cs=iw.getComputedStyle(el);
+                if(cs.display==='none'||cs.visibility==='hidden'||cs.opacity==='0')return;
+              }catch(e){}
+              // 直接テキストノードのみ
+              const tns=Array.from(el.childNodes).filter(nd=>nd.nodeType===3&&nd.textContent.trim().length>1);
+              if(!tns.length)return;
+              const text=tns.map(nd=>nd.textContent.trim()).join('');
+              if(text.length<2||text.length>200)return;
+              // 同じテキストは同じIDを再利用（増殖防止）
+              if(seen.has(text)){
+                const existingId=Object.entries(extracted).find(([,v])=>v===text)?.[0];
+                if(existingId)el.setAttribute('data-daima','text-'+existingId);
+                return;
+              }
+              seen.add(text);
+              el.setAttribute('data-daima','text-'+counter);
+              extracted[counter]=text;
+              counter++;
+            });
+            // ユーザー編集分を再適用（iframeリロード後も保持）
+            Object.entries(autoTextsRef.current).forEach(([num,edited])=>{
+              if(extracted[num]===undefined)return;
+              if(edited===extracted[num])return; // 変更なし
+              const el=doc.querySelector('[data-daima="text-'+num+'"');
+              if(!el)return;
+              Array.from(el.childNodes).forEach(nd=>{
+                if(nd.nodeType===3&&nd.textContent.trim())nd.textContent=edited;
+              });
+            });
+            // stateに反映（ユーザー編集を優先してマージ）
+            setAutoTexts(prev=>{
+              const merged={...extracted};
+              Object.entries(prev).forEach(([k,v])=>{if(merged[k]!==undefined)merged[k]=v;});
+              return merged;
+            });
+          }
+        },150); // 少し長めに待つ（CSS計算が完了するまで）
+      },[]);
+
+      const applyTrans=useCallback((nt)=>{
+        const iw=iframeRef.current?.contentWindow;
+        const doc=iframeRef.current?.contentDocument;
+        if(iw?.daimaSet){
+          iw.daimaSet(nt);
+        } else if(doc) {
+          // daimaSet未定義時のフォールバック：直接DOMを操作
+          Object.entries(nt).forEach(([id,t])=>{
+            const el=doc.querySelector('[data-daima="'+id+'"]');
+            if(!el)return;
+            el.style.transform='translate('+t.x+'px,'+t.y+'px) rotate('+t.r+'deg) scale('+(t.s||1)+')';
+            el.style.fontSize=(t.fs&&t.fs!==100)?t.fs+'%':'';
+          });
+        }
+      },[]);
+
+      // モーダルの確定処理（テキスト更新 + フォントサイズ適用）
+      const confirmEditModal=useCallback(()=>{
+        if(!editModal)return;
+        // テキスト更新
+        setTextVals(p=>({...p,[editModal.num]:editModal.text}));
+        // フォントサイズをtransに保存して即適用
+        const nt={...transRef.current,[editModal.id]:{...(transRef.current[editModal.id]||{x:0,y:0,r:0,s:1}),fs:editModal.fs}};
+        setTrans(nt);
+        applyTrans(nt);
+        setEditModal(null);
+      },[editModal,applyTrans]);
+
+      const toggleHide=useCallback((elemId)=>{
+        const iframe=iframeRef.current;
+        setHiddenElems(prev=>{
+          const isHidden=prev.includes(elemId);
+          const next=isHidden?prev.filter(id=>id!==elemId):[...prev,elemId];
+          if(iframe?.contentDocument){
+            const el=iframe.contentDocument.querySelector(`[data-daima="${elemId}"]`);
+            if(el)el.style.display=isHidden?"":"none";
+          }
+          return next;
+        });
+      },[]);
+
+      const handleImgUpload=useCallback((id,file)=>{
+        if(!file)return;
+        const r=new FileReader();r.onload=e=>setImgUrls(p=>({...p,[id]:e.target.result}));r.readAsDataURL(file);
+      },[]);
+
+      // ── API呼び出し ──
+      // ── HTMLからテキストを自動抽出して{{TEXT_n}}プレースホルダーに変換 ──
+      // AIが{{TEXT_n}}を使わなかった場合でもテキスト編集パネルを表示できる
+      // processHtmlFromAI: HTMLは変更しない
+      // テキスト抽出はiframeロード後にsetupIframe内で行う（HTML改変による破壊を防ぐ）
+      const processHtmlFromAI=(html)=>({html,texts:{}});
+
+      const callApi=async(system,messages)=>{
+        const res=await fetch("/api/claude",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:8000,system,messages}),
+        });
+        if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
+        const data=await res.json();
+        return data.content.filter(b=>b.type==="text").map(b=>b.text).join("\n")
+          .replace(/^```(?:html)?\s*/i,"").replace(/\s*```\s*$/i,"").trim();
+      };
+
+      const handleGenerate=async()=>{
+        setLoading(true);setLoadMsg("AIがデザインを作成中... ✨");setError("");
+        try{
+          const colorSpec=useAutoColor
+            ?"おまかせ（佐藤心のパーソナルカラー系ピンク・スウィーティーカラーベース）"
+            :`メインカラー: ${mainColor} / サブカラー: ${subColor}`;
+          const filledSystem=SYSTEM_PROMPT_TEMPLATE
+            .replace("{{PAGE_COUNT}}",pageCount)
+            .replace("{{THEME}}",designTheme)
+            .replace("{{LAYOUT_DIR}}",layoutDir)
+            .replace("{{MAIN_COLOR}}",colorSpec)
+            .replace("{{TEXT_CONTENT}}",textContent||"おまかせ（佐藤心らしい投票呼びかけセリフを自動生成）")
+            .replace("{{ADDITIONAL_REQUEST}}",addReq||"特になし");
+          systemRef.current=filledSystem;
+          const msgs=[{role:"user",content:"HTMLフライヤーを生成してください。"}];
+          const html=await callApi(filledSystem,msgs);
+          if(!html.includes("<html")&&!html.includes("<!DOCTYPE"))throw new Error("HTMLの生成に失敗しました。もう一度お試しください。");
+          setChatHist([...msgs,{role:"assistant",content:html}]);
+          const {html:procHtml, texts:initTexts}=processHtmlFromAI(html);
+          setRawHtml(procHtml);setTextVals(initTexts);setTrans({});setHiddenElems([]);setScreen("edit");setActiveTab("preview");
+        }catch(e){setError(e.message);}finally{setLoading(false);}
+      };
+
+      const handleRevise=async()=>{
+        if(!revise.trim()||loading)return;
+        setLoading(true);setLoadMsg("AIが修正中... 🔧");setError("");
+        try{
+          const msgs=[...chatHist,{role:"user",content:revise}];
+          const html=await callApi(systemRef.current,msgs);
+          setChatHist([...msgs,{role:"assistant",content:html}]);
+          const {html:procHtml2, texts:initTexts2}=processHtmlFromAI(html);
+          setRawHtml(procHtml2);setTextVals(initTexts2);setTrans({});setHiddenElems([]);setRevise("");
+          if(isMobile)setActiveTab("preview");
+        }catch(e){setError(e.message);}finally{setLoading(false);}
+      };
+
+      // ── 保存：プレビューiframeをそのままキャプチャ（WYSIWYG） ──
+      const handleSave=async()=>{
+        setSaving(true);
+        let dataUrl=null;
+        const iframe=iframeRef.current;
+        let dmCss=null;
+        try{
+          if(!window.html2canvas||!iframe?.contentDocument)throw new Error("not ready");
+          // インタラクションCSSを一時除去（ドラッグUI非表示）
+          dmCss=iframe.contentDocument.querySelector("#dm-css");
+          if(dmCss)dmCss.remove();
+          // スクロールをトップにリセット（上が切れる問題の防止）
+          try{
+            iframe.contentWindow.scrollTo(0,0);
+            iframe.contentDocument.documentElement.scrollTop=0;
+            iframe.contentDocument.body.scrollTop=0;
+          }catch(e){}
+          // フォント読み込み待ち
+          await Promise.race([
+            iframe.contentDocument.fonts.ready,
+            new Promise(r=>setTimeout(r,2000))
+          ]).catch(()=>{});
+          await new Promise(r=>setTimeout(r,400));
+          // プレビューと同じ幅でキャプチャ（見た目通りに出力）
+          const iframeW=iframe.contentDocument.documentElement.scrollWidth||iframe.clientWidth||290;
+          const canvas=await window.html2canvas(iframe.contentDocument.documentElement,{
+            useCORS:true,allowTaint:false,scale:2,logging:false,
+            backgroundColor:"#ffffff",imageTimeout:15000,
+            scrollX:0,scrollY:0,
+            windowWidth:iframeW,
+          });
+          try{dataUrl=canvas.toDataURL("image/png");}catch(e){console.warn("tainted:",e);}
+        }catch(err){
+          console.error("Save failed:",err);
+        }finally{
+          // インタラクションCSS復元
+          if(dmCss&&iframe?.contentDocument){
+            const ns=iframe.contentDocument.createElement("style");
+            ns.id="dm-css";ns.textContent=INTERACTION_CSS;
+            iframe.contentDocument.head?.appendChild(ns);
+          }
+          setSaving(false);
+        }
+        setCompletedUrl(dataUrl);
+        setScreen("complete");
+      };
+
+      // ══════════════════════════════════════════════
+      // 画像ピッカー
+      // ══════════════════════════════════════════════
+      const ImagePicker=({imageId})=>{
+        const [q,setQ]=useState("");
+        const nav=picNav[imageId]||{};
+        const setN=(upd)=>setPicNav(p=>({...p,[imageId]:{...p[imageId],...upd}}));
+        const game=IMAGE_LIBRARY.find(g=>g.id===nav.gameId);
+        const set=game?.sets.find(s=>s.id===nav.setId);
+
+        if(nav.gameId&&nav.setId&&set){
+          return(
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"0.71rem",marginBottom:"9px",flexWrap:"wrap"}}>
+                <button onClick={()=>setN({gameId:undefined,setId:undefined})} style={{background:"none",border:"none",color:C.dark,cursor:"pointer",fontSize:"0.71rem",fontFamily:FONT,padding:0,fontWeight:"bold"}}>{game.icon} {game.label}</button>
+                <span style={{color:C.gray}}>›</span>
+                <button onClick={()=>setN({setId:undefined})} style={{background:"none",border:"none",color:C.dark,cursor:"pointer",fontSize:"0.71rem",fontFamily:FONT,padding:0,fontWeight:"bold"}}>{set.label}</button>
+                <span style={{color:C.gray}}>›</span>
+                <span style={{color:C.gray}}>種類</span>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:"7px"}}>
+                {set.types.map(type=>(
+                  <button key={type.id} onClick={()=>{setImgUrls(p=>({...p,[imageId]:type.url}));setN({setId:undefined});}}
+                    style={{padding:0,border:`2.5px solid ${imgUrls[imageId]===type.url?C.dark:"#e0e0e0"}`,borderRadius:"9px",cursor:"pointer",background:C.white,overflow:"hidden",transition:"border-color 0.15s"}}>
+                    <img src={type.url} alt={type.label} style={{width:"100%",height:"65px",objectFit:"cover",objectPosition:"top",display:"block"}} onError={e=>e.target.style.height="40px"} />
+                    <div style={{fontSize:"0.73rem",color:C.dark,padding:"4px 0",fontWeight:"bold"}}>{type.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        if(nav.gameId&&!nav.setId&&game){
+          const filtered=game.sets.filter(s=>s.label.includes(q)||q==="");
+          return(
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"0.71rem",marginBottom:"7px"}}>
+                <button onClick={()=>setN({gameId:undefined})} style={{background:"none",border:"none",color:C.dark,cursor:"pointer",fontSize:"0.71rem",fontFamily:FONT,padding:0,fontWeight:"bold"}}>{game.icon} {game.label}</button>
+                <span style={{color:C.gray}}>›</span><span style={{color:C.gray}}>カードを選択</span>
+              </div>
+              <input value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 カード名で絞り込み..."
+                style={{...inp,fontSize:"0.82rem",marginBottom:"7px",padding:"7px 10px"}} />
+              <div style={{maxHeight:"200px",overflowY:"auto",display:"flex",flexDirection:"column",gap:"4px"}}>
+                {filtered.length===0&&<div style={{color:C.gray,fontSize:"0.79rem",textAlign:"center",padding:"10px"}}>見つかりませんでした</div>}
+                {filtered.map(s=>(
+                  <button key={s.id} onClick={()=>setN({setId:s.id})}
+                    style={{padding:"8px 12px",background:C.light,border:`1.5px solid ${C.pink}`,borderRadius:"9px",cursor:"pointer",textAlign:"left",fontSize:"0.82rem",color:C.text,fontFamily:FONT,display:"flex",alignItems:"center",gap:"6px"}}>
+                    <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.label}</span>
+                    <span style={{color:C.gray,fontSize:"0.7rem",flexShrink:0}}>{s.types.length}種 ›</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        return(
+          <div>
+            <div style={{fontSize:"0.71rem",color:C.gray,marginBottom:"8px"}}>カテゴリを選択：</div>
+            <div style={{display:"flex",flexDirection:"column",gap:"5px",marginBottom:"9px"}}>
+              {IMAGE_LIBRARY.map(g=>(
+                <button key={g.id} onClick={()=>setN({gameId:g.id,setId:undefined})}
+                  style={{padding:"9px 12px",background:C.light,border:`1.5px solid ${C.pink}`,borderRadius:"9px",cursor:"pointer",textAlign:"left",fontSize:"0.87rem",color:C.text,fontFamily:FONT,display:"flex",alignItems:"center",gap:"9px"}}>
+                  <span style={{fontSize:"1.2rem"}}>{g.icon}</span>
+                  <span style={{flex:1}}>{g.label}</span>
+                  <span style={{color:C.gray,fontSize:"0.75rem"}}>{g.sets.length}枚 ›</span>
+                </button>
+              ))}
+            </div>
+            <label style={{display:"block",padding:"8px",textAlign:"center",border:`1.5px dashed ${C.dark}`,borderRadius:"9px",cursor:"pointer",fontSize:"0.79rem",color:C.dark,background:C.white}}>
+              📁 直接アップロード
+              <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&handleImgUpload(imageId,e.target.files[0])} />
+            </label>
+          </div>
+        );
+      };
+
+      // ══════════════════════════════════════════════
+      // 位置・回転・スケール・非表示コントロール
+      // ══════════════════════════════════════════════
+      const allElemIds=useMemo(()=>[...textIds.map(id=>`text-${id}`),...imgIds.map(id=>`image-${id}`)],[textIds,imgIds]);
+
+      const TransformPanel=({elemId})=>{
+        const isText=elemId.startsWith("text-");
+        const t=trans[elemId]||{x:0,y:0,r:0,s:1,fs:100};
+        const isHidden=hiddenElems.includes(elemId);
+        const label=isText?`テキスト ${elemId.split("-")[1]}`:`画像 ${elemId.split("-")[1]}`;
+        const defaults={x:0,y:0,r:0,s:1,fs:100};
+        const update=(key,val)=>{
+          const nt={...transRef.current,[elemId]:{...(transRef.current[elemId]||defaults),[key]:val}};
+          setTrans(nt);applyTrans(nt);
+        };
+        const Row=({lbl,k,min,max,step,unit,defVal})=>{
+          const val=t[k]!==undefined?t[k]:(defVal||0);
+          const pct=((val-min)/(max-min)*100).toFixed(1);
+          return(
+            <div style={{marginBottom:"5px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:"0.69rem",color:C.gray,marginBottom:"2px"}}>
+                <span>{lbl}</span>
+                <span style={{color:C.dark,fontWeight:"bold"}}>{Math.round(val*10)/10}{unit}</span>
+              </div>
+              <input type="range" min={min} max={max} step={step} value={val}
+                onChange={e=>update(k,Number(e.target.value))}
+                style={{width:"100%",accentColor:C.dark,cursor:"pointer",background:`linear-gradient(to right,${C.dark} 0%,${C.dark} ${pct}%,#F0D0D8 ${pct}%,#F0D0D8 100%)`}} />
+            </div>
+          );
+        };
+        return(
+          <div style={{background:isHidden?"#f5f5f5":C.mid,borderRadius:"10px",padding:"10px 12px",marginBottom:"8px",opacity:isHidden?0.6:1,transition:"all 0.2s"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"7px",gap:"5px",flexWrap:"wrap"}}>
+              <span style={{fontSize:"0.75rem",fontWeight:"bold",color:C.dark,flex:1}}>{label}</span>
+              {isText&&(
+                <button onClick={()=>{
+                  const num=elemId.replace("text-","");
+                  setEditModal({id:elemId,num,text:textVals[num]||"",fs:t.fs||100});
+                }} style={{fontSize:"0.66rem",color:C.white,background:C.dark,border:"none",borderRadius:"5px",padding:"3px 8px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>
+                  ✎ 文字を編集
+                </button>
+              )}
+              <button onClick={()=>toggleHide(elemId)} style={{fontSize:"0.66rem",color:isHidden?C.dark:"#888",background:C.white,border:`1px solid ${isHidden?C.pink:"#ddd"}`,borderRadius:"5px",padding:"2px 7px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>
+                {isHidden?"👁 表示":"🙈 非表示"}
+              </button>
+              <button onClick={()=>{const nt={...transRef.current,[elemId]:defaults};setTrans(nt);applyTrans(nt);}} style={{fontSize:"0.66rem",color:C.gray,background:"none",border:`1px solid #ccc`,borderRadius:"5px",padding:"2px 6px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>↺</button>
+            </div>
+            {!isHidden&&(
+              <>
+                <Row lbl="← 左右 →"   k="x"  min={-200} max={200} step={1}    unit="px"  defVal={0}   />
+                <Row lbl="↑ 上下 ↓"   k="y"  min={-300} max={300} step={1}    unit="px"  defVal={0}   />
+                <Row lbl="↺ 回転"     k="r"  min={-180}  max={180} step={0.5}  unit="°"   defVal={0}   />
+                <Row lbl="🔍 拡大縮小" k="s"  min={0.1}  max={3}   step={0.05} unit="x"   defVal={1}   />
+                {isText&&(
+                  <Row lbl="🅰 文字サイズ" k="fs" min={30} max={300} step={5} unit="%" defVal={100} />
+                )}
+              </>
+            )}
+          </div>
+        );
+      };
+
+      // ══════════════════════════════════════════════
+      // コントロールパネル
+      // ══════════════════════════════════════════════
+      const hasPlaceholders=textIds.length>0||imgIds.length>0;
+
+      const controlsPanel=(
+        <div style={{overflowY:"auto",background:C.white,padding:"15px",display:"flex",flexDirection:"column",gap:"14px",...(isMobile?{flex:1}:{width:"320px",minWidth:"300px",borderRight:`1px solid ${C.mid}`})}}>
+          {error&&<div style={{padding:"9px 12px",background:"#fff0f0",border:"1px solid #ffcaca",borderRadius:"9px",color:"#d9534f",fontSize:"0.79rem"}}>⚠️ {error}</div>}
+          {!hasPlaceholders&&rawHtml&&<div style={{padding:"10px",background:"#fffbe6",border:"1px solid #ffe58f",borderRadius:"9px",fontSize:"0.79rem",color:"#8a6914"}}>⚠️ プレースホルダーが検出されませんでした。AIに修正依頼してみてください。</div>}
+
+          {/* ══ テキスト編集（プレースホルダー方式） ══ */}
+          {textIds.length>0&&(
+            <section style={{background:C.mid,borderRadius:"14px",padding:"14px"}}>
+              <div style={{...SH,marginBottom:"12px"}}>✍️ テキストを編集する</div>
+              {textIds.map(id=>(
+                <div key={id} style={{marginBottom:"12px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
+                    <label style={{fontSize:"0.78rem",fontWeight:"bold",color:C.dark}}>テキスト {id}</label>
+                    <button onClick={()=>setEditModal({id:`text-${id}`,num:id,text:textVals[id]||"",fs:trans[`text-${id}`]?.fs||100})}
+                      style={{fontSize:"0.72rem",color:C.white,background:C.dark,border:"none",borderRadius:"8px",padding:"4px 10px",cursor:"pointer",fontFamily:FONT}}>
+                      🅰 サイズも変える
+                    </button>
+                  </div>
+                  <textarea value={textVals[id]||""} rows={2}
+                    onChange={e=>setTextVals(p=>({...p,[id]:e.target.value}))}
+                    placeholder={`テキスト${id}を入力（そのまま打てます）`}
+                    style={{...inp,resize:"vertical",fontSize:"0.9rem",background:C.white,border:`2px solid ${C.pink}`}} />
+                </div>
+              ))}
+            </section>
+          )}
+
+          {/* ══ テキスト編集（自動抽出・iframeDOM直接操作・HTMLを壊さない） ══ */}
+          {textIds.length===0&&Object.keys(autoTexts).length>0&&(
+            <section style={{background:C.mid,borderRadius:"14px",padding:"14px"}}>
+              <div style={{...SH,marginBottom:"4px"}}>✍️ テキストを編集する</div>
+              <div style={{fontSize:"0.71rem",color:C.gray,marginBottom:"12px"}}>
+                プレビューを確認しながら直接入力できます
+              </div>
+              {Object.entries(autoTexts).map(([num,text])=>(
+                <div key={num} style={{marginBottom:"12px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
+                    <label style={{fontSize:"0.78rem",fontWeight:"bold",color:C.dark}}>テキスト {num}</label>
+                    <button onClick={()=>setEditModal({id:`text-${num}`,num,text,fs:trans[`text-${num}`]?.fs||100})}
+                      style={{fontSize:"0.72rem",color:C.white,background:C.dark,border:"none",borderRadius:"8px",padding:"4px 10px",cursor:"pointer",fontFamily:FONT}}>
+                      🅰 サイズも変える
+                    </button>
+                  </div>
+                  <textarea value={text} rows={2}
+                    onChange={e=>{
+                      const val=e.target.value;
+                      setAutoTexts(p=>({...p,[num]:val}));
+                      // iframeのDOMを直接更新（リロードなし・即反映）
+                      const el=iframeRef.current?.contentDocument?.querySelector('[data-daima="text-'+num+'"]');
+                      if(el){Array.from(el.childNodes).forEach(nd=>{if(nd.nodeType===3&&nd.textContent.trim())nd.textContent=val;});}
+                    }}
+                    placeholder={"テキスト"+num+"を入力..."}
+                    style={{...inp,resize:"vertical",fontSize:"0.9rem",background:C.white,border:"2px solid "+C.pink}} />
+                </div>
+              ))}
+            </section>
+          )}
+
+          {imgIds.length>0&&(
+            <section>
+              <div style={SH}>🖼️ 画像</div>
+              {imgIds.map(id=>(
+                <div key={id} style={{marginBottom:"14px",padding:"12px",background:C.mid,borderRadius:"11px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"9px"}}>
+                    <div style={{fontSize:"0.73rem",color:C.dark,fontWeight:"bold"}}>画像 {id} {imgUrls[id]?"✅":""}</div>
+                    {imgUrls[id]&&(
+                      <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                        <img src={imgUrls[id]} alt="" style={{width:"32px",height:"32px",objectFit:"cover",objectPosition:"top",borderRadius:"5px",border:`1.5px solid ${C.pink}`}} />
+                        <button onClick={()=>setImgUrls(p=>({...p,[id]:""}))} style={{fontSize:"0.68rem",color:"#999",background:"none",border:"1px solid #ccc",borderRadius:"4px",padding:"2px 6px",cursor:"pointer"}}>✕</button>
+                      </div>
+                    )}
+                  </div>
+                  <ImagePicker imageId={id} />
+                </div>
+              ))}
+            </section>
+          )}
+
+          {allElemIds.length>0&&(
+            <section>
+              <div style={SH}>🎯 位置・回転・拡大縮小</div>
+              <div style={{fontSize:"0.71rem",color:C.gray,marginBottom:"8px",lineHeight:1.5}}>
+                スライダーで数値調整 / プレビュー上でドラッグ移動・↻ 回転も可能
+              </div>
+              {allElemIds.map(eid=><TransformPanel key={eid} elemId={eid}/>)}
+            </section>
+          )}
+
+          <section>
+            <div style={SH}>🔧 AIに修正依頼</div>
+            <textarea value={revise} onChange={e=>setRevise(e.target.value)} rows={3}
+              placeholder={"例: 文字をもっと大きくして\n例: 背景を青系にして\n例: ハートを増やして"}
+              style={{...inp,resize:"none",fontSize:"0.85rem",marginBottom:"8px"}} />
+            <button onClick={handleRevise} disabled={!revise.trim()||loading}
+              style={{...SB(!revise.trim()||loading?false:true),width:"100%",padding:"10px",fontSize:"0.88rem"}}>
+              修正する
+            </button>
+          </section>
+          <div style={{height:"6px"}}/>
+        </div>
+      );
+
+      const previewPanel=(
+        <div style={{background:"#e5e5e5",display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 12px 6px",gap:"5px",...(isMobile?{flex:1,overflow:"hidden"}:{flex:1,overflow:"hidden"})}}>
+
+          {/* テキスト直接編集ボタン（スマホ用・iframe不要・確実に動く） */}
+          {textIds.length>0&&(
+            <div style={{display:"flex",gap:"6px",flexWrap:"wrap",justifyContent:"center",flexShrink:0}}>
+              {textIds.map(id=>(
+                <button key={id}
+                  onClick={()=>setEditModal({id:`text-${id}`,num:id,text:textVals[id]||"",fs:trans[`text-${id}`]?.fs||100})}
+                  style={{
+                    padding:"5px 13px",background:C.dark,color:C.white,
+                    border:"none",borderRadius:"20px",fontSize:"0.78rem",
+                    fontWeight:"bold",cursor:"pointer",fontFamily:FONT,
+                    boxShadow:"0 2px 8px rgba(212,128,147,0.4)",
+                  }}>
+                  ✎ テキスト{id}を編集
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div style={{fontSize:"0.68rem",color:"#aaa",flexShrink:0,textAlign:"center"}}>
+            ドラッグ移動 / ↻ 回転
+          </div>
+
+          <div style={{flex:1,overflow:"auto",width:"100%",display:"flex",justifyContent:"center",alignItems:"flex-start"}}>
+            <div style={{width:"min(360px, calc(100% - 10px))",flexShrink:0,aspectRatio:"9/16",borderRadius:"14px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,0.22)",border:`3px solid ${C.pink}`,background:C.white}}>
+              <iframe ref={iframeRef} srcDoc={srcDoc} onLoad={setupIframe}
+                style={{width:"100%",height:"100%",border:"none",display:"block"}}
+                title="preview" sandbox="allow-same-origin allow-scripts" />
+            </div>
+          </div>
+        </div>
+      );
+
+      // ── 共通ヘッダー ──
+      const editHeader=(
+        <div style={{background:`linear-gradient(135deg,${C.pink},${C.dark})`,padding:"0 14px",height:"52px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(212,128,147,0.32)"}}>
+          <button onClick={()=>setScreen("prompt")} style={{color:C.white,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:"8px",padding:"6px 11px",cursor:"pointer",fontSize:"0.82rem"}}>← 戻る</button>
+          <span style={{color:C.white,fontWeight:"bold",fontSize:"0.9rem"}}>🌸 ダイマ編集</span>
+          <button onClick={handleSave} disabled={saving} style={{background:C.white,color:C.dark,border:"none",borderRadius:"9px",padding:"6px 14px",fontWeight:"bold",cursor:saving?"not-allowed":"pointer",fontSize:"0.86rem",boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}>
+            {saving?"生成中...":"💾 完成！"}
+          </button>
+        </div>
+      );
+
+      // ══════════════════════════════════════════════
+      // ✍️ テキスト編集モーダル（PC・スマホ共通）
+      // ══════════════════════════════════════════════
+      const TextEditModal = editModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:10000,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+          onClick={()=>setEditModal(null)}>
+          <div style={{width:"100%",maxWidth:"560px",background:C.white,borderRadius:"22px 22px 0 0",padding:"24px 20px 32px",boxShadow:"0 -8px 40px rgba(0,0,0,0.2)"}}
+            onClick={e=>e.stopPropagation()}>
+            {/* ドラッグハンドル */}
+            <div style={{width:"40px",height:"4px",background:"#ddd",borderRadius:"2px",margin:"0 auto 18px",cursor:"grab"}}/>
+            <div style={{fontSize:"0.88rem",fontWeight:"bold",color:C.dark,marginBottom:"12px"}}>
+              ✎ テキスト {editModal.num} を編集
+            </div>
+            {/* テキスト入力 */}
+            <textarea autoFocus value={editModal.text}
+              onChange={e=>setEditModal(p=>({...p,text:e.target.value}))}
+              placeholder="テキストを入力..."
+              style={{...inp,minHeight:"90px",resize:"vertical",marginBottom:"16px",fontSize:"1rem"}}
+            />
+            {/* フォントサイズ */}
+            <div style={{marginBottom:"18px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:"0.78rem",color:C.gray,marginBottom:"5px"}}>
+                <span>🅰 文字サイズ</span>
+                <span style={{color:C.dark,fontWeight:"bold"}}>{editModal.fs}%</span>
+              </div>
+              <input type="range" min={30} max={300} step={5} value={editModal.fs}
+                onChange={e=>setEditModal(p=>({...p,fs:Number(e.target.value)}))}
+                style={{width:"100%",accentColor:C.dark,cursor:"pointer"}} />
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:"0.7rem",color:"#ccc",marginTop:"2px"}}>
+                <span>小さく(30%)</span><span>標準(100%)</span><span>大きく(300%)</span>
+              </div>
+            </div>
+            {/* ボタン */}
+            <div style={{display:"flex",gap:"10px"}}>
+              <button onClick={()=>setEditModal(null)}
+                style={{flex:1,padding:"13px",background:"#f0f0f0",border:"none",borderRadius:"12px",fontWeight:"bold",cursor:"pointer",color:C.text,fontFamily:FONT,fontSize:"0.92rem"}}>
+                キャンセル
+              </button>
+              <button onClick={confirmEditModal}
+                style={{...PB(true),flex:2,padding:"13px",fontSize:"0.95rem",borderRadius:"12px"}}>
+                ✓ 確定
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+
+      const loadOverlay=loading&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(255,240,243,0.93)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,flexDirection:"column",gap:"15px"}}>
+          <style>{`@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}`}</style>
+          <div style={{fontSize:"2.8rem",animation:"spin 2s linear infinite"}}>✨</div>
+          <div style={{color:C.dark,fontWeight:"bold",fontSize:"1.1rem"}}>{loadMsg}</div>
+        </div>
+      );
+
+      // ══════════════════════════════════════════════
+      // 🔒 PIN スクリーン
+      // ══════════════════════════════════════════════
+      const doPin=(k)=>{
+        if(k==="⌫"){if(!pinShake){setPin(p=>p.slice(0,-1));setPinErr(false);}}
+        else{
+          if(pin.length>=4||pinShake)return;
+          const next=pin+k;setPin(next);setPinErr(false);
+          if(next.length===4){
+            if(next===CORRECT_PIN){setAuth(true);}
+            else{setPinErr(true);setPinShake(true);setTimeout(()=>{setPin("");setPinErr(false);setPinShake(false);},900);}
+          }
+        }
+      };
+
+      if(!auth){
+        const KEYS=["1","2","3","4","5","6","7","8","9","","0","⌫"];
+        return(
+          <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${C.light},#FFE6EA,#FFD6DC)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FONT,padding:"20px"}}>
+            <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}} @keyframes hb{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}} .pc{animation:${pinShake?"shake 0.5s ease":"none"}} .lg{animation:hb 2.2s ease-in-out infinite}`}</style>
+            <div className="pc" style={{width:"100%",maxWidth:"315px",background:C.white,borderRadius:"24px",padding:"40px 26px 32px",boxShadow:"0 16px 52px rgba(212,128,147,0.28)",textAlign:"center"}}>
+              <div className="lg" style={{fontSize:"3rem",marginBottom:"8px"}}>🌸</div>
+              <h2 style={{color:C.dark,margin:"0 0 4px",fontSize:"1.28rem"}}>佐藤心 ダイマ作成AI</h2>
+              <p style={{color:C.gray,fontSize:"0.79rem",margin:"0 0 26px"}}>パスワードを入力してください</p>
+              <div style={{display:"flex",justifyContent:"center",gap:"14px",marginBottom:"14px"}}>
+                {Array(4).fill(null).map((_,i)=>(<div key={i} style={{width:"14px",height:"14px",borderRadius:"50%",border:`2px solid ${pinErr?"#e85b6e":C.pink}`,background:i<pin.length?(pinErr?"#e85b6e":C.dark):"transparent",transition:"all 0.2s"}}/>))}
+              </div>
+              <div style={{height:"18px",fontSize:"0.76rem",color:"#e85b6e",marginBottom:"18px",opacity:pinErr?1:0}}>パスワードが違います</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"9px"}}>
+                {KEYS.map((k,i)=>{if(k==="")return <div key={i}/>;return(
+                  <button key={i} onClick={()=>doPin(k)} style={{padding:"15px 0",background:k==="⌫"?C.mid:C.light,border:`1.5px solid ${C.pink}`,borderRadius:"12px",fontSize:k==="⌫"?"1.2rem":"1.3rem",fontWeight:"bold",color:k==="⌫"?C.dark:C.text,cursor:"pointer",transition:"transform 0.1s",fontFamily:FONT}}
+                    onMouseDown={e=>e.currentTarget.style.transform="scale(0.91)"} onMouseUp={e=>e.currentTarget.style.transform="scale(1)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>{k}</button>
+                );})}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ══════════════════════════════════════════════
+      // 🌸 プロンプト（構造化フォーム）スクリーン
+      // ══════════════════════════════════════════════
+      if(screen==="prompt"){
+        const canGen=!loading;
+        const SegBtn=({value,cur,set,label})=>(
+          <button onClick={()=>set(value)} style={{
+            flex:1, padding:"8px 4px", border:`1.5px solid ${cur===value?C.dark:C.pink}`,
+            borderRadius:"8px", background:cur===value?C.pink:C.white,
+            color:cur===value?C.white:C.dark, cursor:"pointer",
+            fontSize:"0.75rem", fontWeight:cur===value?"bold":"normal",
+            fontFamily:FONT, lineHeight:1.3, transition:"all 0.2s"
+          }}>{label}</button>
+        );
+
+        return(
+          <div style={{minHeight:"100vh",background:`linear-gradient(135deg,${C.light},#FFE6EA)`,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px 16px",fontFamily:FONT}}>
+            {loadOverlay}
+            <div style={{width:"100%",maxWidth:"560px",background:C.white,borderRadius:"22px",padding:"32px 28px",boxShadow:"0 16px 52px rgba(212,128,147,0.22)"}}>
+              <div style={{textAlign:"center",marginBottom:"24px"}}>
+                <div style={{fontSize:"2.4rem",marginBottom:"6px"}}>🌸</div>
+                <h1 style={{color:C.dark,fontSize:"1.45rem",margin:0,fontWeight:"bold"}}>佐藤心 ダイマ作成AI</h1>
+                <p style={{color:C.gray,fontSize:"0.84rem",margin:"7px 0 0"}}>フォームを入力してAIにデザインを依頼しよう！</p>
+              </div>
+
+              {/* ページ数（必須） */}
+              <div style={{marginBottom:"18px"}}>
+                <label style={{fontSize:"0.82rem",fontWeight:"bold",color:C.dark,display:"block",marginBottom:"8px"}}>
+                  📄 ページ数 <span style={{color:"#e85b6e",fontSize:"0.75rem"}}>必須</span>
+                </label>
+                <div style={{display:"flex",gap:"8px"}}>
+                  {[["1","1枚"],["2","2枚"],["3","3枚"],["4","4枚"]].map(([v,l])=>(
+                    <SegBtn key={v} value={v} cur={pageCount} set={setPageCount} label={l} />
+                  ))}
+                </div>
+              </div>
+
+              {/* デザインテーマ */}
+              <div style={{marginBottom:"18px"}}>
+                <label style={{fontSize:"0.82rem",fontWeight:"bold",color:C.dark,display:"block",marginBottom:"8px"}}>🎨 デザインテーマ</label>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
+                  {[["王道スウィーティー（ピンク＆リボンベース）","🎀 王道\nスウィーティー"],["ポップキュート（イエロー＆星・ポップベース）","⭐ ポップ\nキュート"],["大人スウィーティー（落ち着いたピンク＆ゴールド）","✨ 大人\nスウィーティー"],["おまかせ","🌸 おまかせ"]].map(([v,l])=>(
+                    <button key={v} onClick={()=>setDesignTheme(v)} style={{padding:"10px 8px",border:`1.5px solid ${designTheme===v?C.dark:C.pink}`,borderRadius:"10px",background:designTheme===v?C.pink:C.white,color:designTheme===v?C.white:C.dark,cursor:"pointer",fontSize:"0.75rem",fontWeight:designTheme===v?"bold":"normal",fontFamily:FONT,lineHeight:1.4,whiteSpace:"pre-line",transition:"all 0.2s"}}>{l}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* レイアウト方向性 */}
+              <div style={{marginBottom:"18px"}}>
+                <label style={{fontSize:"0.82rem",fontWeight:"bold",color:C.dark,display:"block",marginBottom:"8px"}}>📐 レイアウトの方向性</label>
+                <div style={{display:"flex",gap:"6px"}}>
+                  {[["イラスト重視（画像枠を大きく配置）","🖼 イラスト重視"],["メッセージ重視（キャッチコピーを目立たせる）","💬 メッセージ重視"],["バランス型","⚖️ バランス型"]].map(([v,l])=>(
+                    <SegBtn key={v} value={v} cur={layoutDir} set={setLayoutDir} label={l} />
+                  ))}
+                </div>
+              </div>
+
+              {/* カラー設定 */}
+              <div style={{marginBottom:"18px"}}>
+                <label style={{fontSize:"0.82rem",fontWeight:"bold",color:C.dark,display:"block",marginBottom:"8px"}}>🎨 カラー設定</label>
+                <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
+                  <label style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"0.82rem",color:C.text,cursor:"pointer"}}>
+                    <input type="checkbox" checked={useAutoColor} onChange={e=>setUseAutoColor(e.target.checked)} style={{width:"16px",height:"16px",accentColor:C.dark}} />
+                    おまかせ
+                  </label>
+                  {!useAutoColor&&(
+                    <>
+                      <label style={{display:"flex",alignItems:"center",gap:"5px",fontSize:"0.78rem",color:C.gray}}>
+                        メイン
+                        <input type="color" value={mainColor} onChange={e=>setMainColor(e.target.value)} />
+                      </label>
+                      <label style={{display:"flex",alignItems:"center",gap:"5px",fontSize:"0.78rem",color:C.gray}}>
+                        サブ
+                        <input type="color" value={subColor} onChange={e=>setSubColor(e.target.value)} />
+                      </label>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* テキスト */}
+              <div style={{marginBottom:"18px"}}>
+                <label style={{fontSize:"0.82rem",fontWeight:"bold",color:C.dark,display:"block",marginBottom:"5px"}}>💬 掲載したいセリフ・テキスト <span style={{fontWeight:"normal",color:C.gray,fontSize:"0.75rem"}}>（任意）</span></label>
+                <p style={{fontSize:"0.74rem",color:C.gray,marginBottom:"6px"}}>空欄の場合はAIが佐藤心らしいセリフを自動生成します</p>
+                <textarea value={textContent} onChange={e=>setTextContent(e.target.value)} rows={2}
+                  placeholder={"例: トップまで頼むわ☆　年が年なんで☆\n例: プロデューサーとはぁとは一蓮托生☆"}
+                  style={{...inp,resize:"vertical"}} />
+              </div>
+
+              {/* その他 */}
+              <div style={{marginBottom:"22px"}}>
+                <label style={{fontSize:"0.82rem",fontWeight:"bold",color:C.dark,display:"block",marginBottom:"5px"}}>✨ その他のこだわり <span style={{fontWeight:"normal",color:C.gray,fontSize:"0.75rem"}}>（任意）</span></label>
+                <textarea value={addReq} onChange={e=>setAddReq(e.target.value)} rows={2}
+                  placeholder={"例: カード名「はぁと・トゥ・ハート」のイメージで\n例: ユニット「しゅがしゅが☆み～ん」を入れて"}
+                  style={{...inp,resize:"vertical"}} />
+              </div>
+
+              {error&&<div style={{marginBottom:"12px",padding:"10px 14px",background:"#fff0f0",border:"1px solid #ffcaca",borderRadius:"9px",color:"#d9534f",fontSize:"0.83rem"}}>⚠️ {error}</div>}
+
+              <button onClick={handleGenerate} disabled={!canGen}
+                style={{...PB(canGen),width:"100%",padding:"15px",fontSize:"1rem"}}>
+                {loading?loadMsg:"✨ ダイマを生成する →"}
+              </button>
+              <p style={{textAlign:"center",color:C.gray,fontSize:"0.71rem",marginTop:"10px"}}>Ctrl+Enter でも生成できます</p>
+            </div>
+          </div>
+        );
+      }
+
+      // ══════════════════════════════════════════════
+      // 🎉 完成画面（PNG表示）
+      // ══════════════════════════════════════════════
+      if(screen==="complete"){
+        return(
+          <div style={{height:"100vh",display:"flex",flexDirection:"column",fontFamily:FONT,background:"#f0f0f0"}}>
+            <div style={{background:`linear-gradient(135deg,${C.pink},${C.dark})`,padding:"14px 20px",textAlign:"center",flexShrink:0,boxShadow:"0 2px 12px rgba(212,128,147,0.3)"}}>
+              <h2 style={{color:C.white,fontSize:"1.3rem",margin:"0 0 4px"}}>🎉 作成完了！</h2>
+              <p style={{color:"rgba(255,255,255,0.85)",fontSize:"0.8rem",margin:0}}>
+                {completedUrl?"下の画像を長押し（スマホ）または右クリック（PC）で保存してください":"スクリーンショットで保存してください"}
+              </p>
+            </div>
+
+            <div style={{flex:1,overflow:"auto",padding:"20px",display:"flex",flexDirection:"column",alignItems:"center",gap:"16px"}}>
+              {completedUrl?(
+                <div style={{maxWidth:"400px",width:"100%",borderRadius:"20px",overflow:"hidden",boxShadow:"0 12px 40px rgba(0,0,0,0.2)"}}>
+                  <img src={completedUrl} alt="完成したダイマ" style={{width:"100%",display:"block"}} />
+                </div>
+              ):(
+                <div style={{maxWidth:"400px",width:"100%",background:C.white,borderRadius:"16px",padding:"28px 24px",boxShadow:"0 8px 30px rgba(0,0,0,0.1)",textAlign:"center"}}>
+                  <div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📸</div>
+                  <p style={{color:C.dark,fontWeight:"bold",marginBottom:"8px",fontSize:"0.95rem"}}>画像の自動生成に失敗しました</p>
+                  <p style={{color:C.gray,fontSize:"0.82rem",lineHeight:1.7}}>
+                    外部画像（GitHub）のCORS制限により<br/>
+                    自動キャプチャができませんでした。<br/><br/>
+                    <strong style={{color:C.dark}}>📱 スマホ</strong>: 「編集に戻る」→ プレビューのスクリーンショット<br/>
+                    <strong style={{color:C.dark}}>💻 PC</strong>: 「編集に戻る」→ PrintScreen またはSnipping Tool
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 操作案内とボタン */}
+            <div style={{background:C.white,padding:"16px 20px",flexShrink:0,boxShadow:"0 -2px 12px rgba(212,128,147,0.15)"}}>
+              <div style={{background:C.mid,borderRadius:"12px",padding:"12px 16px",marginBottom:"14px",fontSize:"0.82rem",color:C.dark,lineHeight:1.7}}>
+                <div>📱 <strong>スマホ</strong>: 画像を長押し → 「写真に保存」または「イメージを保存」</div>
+                <div>💻 <strong>PC</strong>: 画像を右クリック → 「名前を付けて画像を保存」</div>
+              </div>
+              <div style={{display:"flex",gap:"10px"}}>
+                <button onClick={()=>setScreen("edit")} style={{...SB(true),flex:1,padding:"12px",fontSize:"0.92rem"}}>
+                  ← 編集に戻る
+                </button>
+                <button onClick={()=>{setScreen("prompt");setRawHtml("");setTrans({});setHiddenElems([]);setChatHist([]);setCompletedUrl(null);}}
+                  style={{...PB(true),flex:1,padding:"12px",fontSize:"0.92rem"}}>
+                  🌸 新しく作る
+                </button>
+              </div>
+              {completedUrl&&(
+                <div style={{textAlign:"center",marginTop:"10px"}}>
+                  <a href={completedUrl} download="daima.png" style={{fontSize:"0.78rem",color:C.gray,textDecoration:"underline"}}>
+                    うまく保存できない場合はここをタップ（代替ダウンロード）
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // ══════════════════════════════════════════════
+      // ✏️ 編集スクリーン（モバイル）
+      // ── ヘッダー・フッターをposition:fixedで固定 ──
+      // ══════════════════════════════════════════════
+      if(isMobile){
+        return(
+          <div style={{height:"100vh",overflow:"hidden",fontFamily:FONT,position:"relative"}}>
+            {TextEditModal}
+            {loadOverlay}
+            <div style={{position:"fixed",top:0,left:0,right:0,height:"52px",zIndex:100}}>
+              {editHeader}
+            </div>
+            <div style={{position:"fixed",top:"52px",left:0,right:0,bottom:"52px",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+              {activeTab==="edit"?controlsPanel:previewPanel}
+            </div>
+            <div style={{position:"fixed",bottom:0,left:0,right:0,height:"52px",zIndex:100,display:"flex",background:C.white,borderTop:`1px solid ${C.mid}`,boxShadow:"0 -2px 10px rgba(212,128,147,0.15)"}}>
+              {[{key:"edit",label:"✍️ 編集"},{key:"preview",label:"📱 プレビュー"}].map(tab=>(
+                <button key={tab.key} onClick={()=>setActiveTab(tab.key)} style={{flex:1,padding:"14px 0",background:"none",border:"none",color:activeTab===tab.key?C.dark:C.gray,fontWeight:activeTab===tab.key?"bold":"normal",fontSize:"0.9rem",cursor:"pointer",borderTop:activeTab===tab.key?`3px solid ${C.dark}`:"3px solid transparent",transition:"all 0.2s",fontFamily:FONT}}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // ══════════════════════════════════════════════
+      // ✏️ 編集スクリーン（デスクトップ）
+      // ══════════════════════════════════════════════
+      return(
+        <div style={{height:"100vh",display:"flex",flexDirection:"column",fontFamily:FONT,background:"#ebebeb",overflow:"hidden"}}>
+          {TextEditModal}
+          {loadOverlay}
+          {editHeader}
+          <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+            {controlsPanel}
+            {previewPanel}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<DaimaCreator />);
+  </script>
+</body>
+</html>

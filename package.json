@@ -1,0 +1,15 @@
+{
+  "name": "daima-creator",
+  "version": "1.0.0",
+  "description": "佐藤心 ダイマ作成AI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
