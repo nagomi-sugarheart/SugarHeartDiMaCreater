@@ -613,30 +613,53 @@
           // ②選択状態クラスを除去
           selEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-sel'));
           selEls.forEach(el=>el.classList.remove('dm-sel'));
-          // ③ CORS画像をblob URLに変換してimgのまま同一オリジン扱いにする
-          //    background-image divポリフィル方式より高画質（ブラウザネイティブ描画を維持）
-          //    html2canvas 1.4.1はobject-fit:coverをサポートしているため変換不要
+          // ③ 画像をCanvasでcover-cropしてdata URLに変換（html2canvasのobject-fit:cover非対応を回避）
+          //    fetch→canvas描画→data URLとすることで、html2canvasは等倍の事前クロップ済み画像を受け取る
           const imgEls=Array.from(iframe.contentDocument.querySelectorAll(
             'img[data-daima^="image-"],[data-daima^="image-"] img'
           ));
           await Promise.all(imgEls.map(async function(img){
             var origSrc=img.getAttribute('src');
             if(!origSrc||!img.complete||img.naturalWidth===0)return;
-            if(origSrc.indexOf('data:')===0)return; // data URLはスキップ
+            var w=img.offsetWidth,h=img.offsetHeight;
+            if(!w||!h)return;
+            var blobUrl=null;
             try{
-              var resp=await fetch(origSrc,{mode:'cors',credentials:'omit'});
-              if(!resp.ok)return;
-              var blob=await resp.blob();
-              var blobUrl=URL.createObjectURL(blob);
+              var imgUrl=origSrc;
+              if(origSrc.indexOf('data:')!==0){
+                var resp=await fetch(origSrc,{mode:'cors',credentials:'omit'});
+                if(!resp.ok)return;
+                blobUrl=URL.createObjectURL(await resp.blob());
+                imgUrl=blobUrl;
+              }
+              var tmpImg=new Image();
+              if(origSrc.indexOf('data:')!==0)tmpImg.crossOrigin='anonymous';
               await new Promise(function(resolve){
-                var done=function(){resolve();};
-                img.onload=done; img.onerror=done;
-                img.src=blobUrl;
-                setTimeout(resolve,3000);
+                tmpImg.onload=resolve;tmpImg.onerror=resolve;
+                tmpImg.src=imgUrl;setTimeout(resolve,5000);
               });
-              imgRestores.push({img:img,origSrc:origSrc,blobUrl:blobUrl});
+              if(!tmpImg.naturalWidth||!tmpImg.naturalHeight){if(blobUrl)URL.revokeObjectURL(blobUrl);return;}
+              // object-fit:coverと同等のクロップ計算
+              var iw=tmpImg.naturalWidth,ih=tmpImg.naturalHeight;
+              var imgAspect=iw/ih,contAspect=w/h;
+              var sx,sy,sw,sh;
+              if(imgAspect>contAspect){sh=ih;sw=ih*contAspect;sx=(iw-sw)/2;sy=0;}
+              else{sw=iw;sh=iw/contAspect;sx=0;sy=(ih-sh)/2;}
+              var cvs=document.createElement('canvas');
+              cvs.width=w*2;cvs.height=h*2;
+              var ctx2d=cvs.getContext('2d');
+              ctx2d.imageSmoothingEnabled=true;ctx2d.imageSmoothingQuality='high';
+              ctx2d.drawImage(tmpImg,sx,sy,sw,sh,0,0,cvs.width,cvs.height);
+              var dataUrl=cvs.toDataURL('image/png');
+              if(blobUrl){URL.revokeObjectURL(blobUrl);blobUrl=null;}
+              await new Promise(function(resolve){
+                img.onload=resolve;img.onerror=resolve;
+                img.src=dataUrl;setTimeout(resolve,2000);
+              });
+              imgRestores.push({img:img,origSrc:origSrc});
             }catch(e){
-              console.warn('blob convert failed:',origSrc,e);
+              if(blobUrl)URL.revokeObjectURL(blobUrl);
+              console.warn('cover-crop failed:',origSrc,e);
             }
           }));
           // ④ dm-page最下層に白背景divを挿入（透過部分の黒ずみ防止）
@@ -693,7 +716,7 @@
         }finally{
           // ── キャプチャ後復元 ──
           whiteBgEls.forEach(function(o){if(o.bg.parentNode===o.el)o.el.removeChild(o.bg);});
-          imgRestores.forEach(function(o){try{if(o.img.src===o.blobUrl)o.img.src=o.origSrc;URL.revokeObjectURL(o.blobUrl);}catch(e){}});
+          imgRestores.forEach(function(o){try{o.img.src=o.origSrc;}catch(e){}});
           rhEls.forEach(el=>{el.style.display='';});
           selEls.forEach(el=>el.classList.add('dm-sel'));
           setSaving(false);
