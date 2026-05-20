@@ -383,6 +383,8 @@
         const iw=iframe.contentWindow;
         // CSSは即時注入（ホバーエフェクト等のため）
         if(!doc.querySelector("#dm-css")){const s=doc.createElement("style");s.id="dm-css";s.textContent=INTERACTION_CSS;doc.head?.appendChild(s);}
+        // 編集中は全要素のoverflowを強制解除（テキスト移動時にどの内側コンテナでもクリップされない）
+        if(!doc.querySelector("#dm-of")){const s=doc.createElement("style");s.id="dm-of";s.textContent="*{overflow:visible!important;}";doc.head?.appendChild(s);}
         setTimeout(()=>{
           // ── テキスト自動抽出（{{TEXT_n}} プレースホルダーがない場合） ──
           if(rawHtmlRef.current&&!/\{\{TEXT_\d+\}\}/.test(rawHtmlRef.current)){
