@@ -601,7 +601,7 @@
         setSaving(true);
         const captures=[];
         const iframe=iframeRef.current;
-        let rhEls=[],selEls=[],imgPolyfills=[],whiteBgEls=[];
+        let rhEls=[],selEls=[],imgRestores=[],whiteBgEls=[];
         try{
           if(!window.html2canvas||!iframe?.contentDocument)throw new Error("not ready");
           // ── キャプチャ前クリーンアップ ──
@@ -611,48 +611,32 @@
           // ②選択状態クラスを除去
           selEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-sel'));
           selEls.forEach(el=>el.classList.remove('dm-sel'));
-          // ③ img[data-daima^="image-"] を background-image div に差し替え
-          //    html2canvasはCORS画像へのobject-fit:coverを正しく処理できない場合がある
-          //    background-size:coverはhtml2canvasで確実にサポートされているため代替として使用
+          // ③ CORS画像をblob URLに変換してimgのまま同一オリジン扱いにする
+          //    background-image divポリフィル方式より高画質（ブラウザネイティブ描画を維持）
+          //    html2canvas 1.4.1はobject-fit:coverをサポートしているため変換不要
           const imgEls=Array.from(iframe.contentDocument.querySelectorAll(
             'img[data-daima^="image-"],[data-daima^="image-"] img'
           ));
-          for(const img of imgEls){
-            // 未ロード・srcなし・サイズ0はスキップ
-            if(!img.getAttribute('src')||!img.complete||img.naturalWidth===0)continue;
-            const w=img.offsetWidth,h=img.offsetHeight;
-            if(!w||!h)continue;
-            // computedStyleでレイアウト系プロパティを取得（classベースCSSも含む）
-            const cs=iframe.contentWindow.getComputedStyle(img);
-            const div=iframe.contentDocument.createElement('div');
-            // レイアウトに影響するプロパティをcomputedStyleからコピー
-            div.style.position=cs.position==='static'?'relative':cs.position;
-            div.style.top=cs.top;
-            div.style.left=cs.left;
-            div.style.right=cs.right;
-            div.style.bottom=cs.bottom;
-            div.style.zIndex=cs.zIndex;
-            div.style.float=cs.float;
-            div.style.margin=cs.margin;
-            div.style.flexShrink=cs.flexShrink;
-            div.style.flexGrow=cs.flexGrow;
-            div.style.alignSelf=cs.alignSelf;
-            if(cs.transform&&cs.transform!=='none')div.style.transform=cs.transform;
-            // サイズをpx固定（この時点の描画サイズを維持）
-            div.style.width=w+'px';
-            div.style.height=h+'px';
-            div.style.display='block';
-            // background-imageでcover表示
-            const safeSrc=img.src.replace(/"/g,'%22');
-            div.style.backgroundImage='url("'+safeSrc+'")';
-            div.style.backgroundSize='cover';
-            div.style.backgroundPosition='center center';
-            div.style.backgroundRepeat='no-repeat';
-            // data-daima属性を引き継ぐ
-            if(img.hasAttribute('data-daima'))div.setAttribute('data-daima',img.getAttribute('data-daima'));
-            img.parentNode.replaceChild(div,img);
-            imgPolyfills.push({div,img});
-          }
+          await Promise.all(imgEls.map(async function(img){
+            var origSrc=img.getAttribute('src');
+            if(!origSrc||!img.complete||img.naturalWidth===0)return;
+            if(origSrc.indexOf('data:')===0)return; // data URLはスキップ
+            try{
+              var resp=await fetch(origSrc,{mode:'cors',credentials:'omit'});
+              if(!resp.ok)return;
+              var blob=await resp.blob();
+              var blobUrl=URL.createObjectURL(blob);
+              await new Promise(function(resolve){
+                var done=function(){resolve();};
+                img.onload=done; img.onerror=done;
+                img.src=blobUrl;
+                setTimeout(resolve,3000);
+              });
+              imgRestores.push({img:img,origSrc:origSrc,blobUrl:blobUrl});
+            }catch(e){
+              console.warn('blob convert failed:',origSrc,e);
+            }
+          }));
           // ④ dm-page最下層に白背景divを挿入（透過部分の黒ずみ防止）
           Array.from(iframe.contentDocument.querySelectorAll('.dm-page')).forEach(function(pageEl){
             var bg=iframe.contentDocument.createElement('div');
@@ -707,7 +691,7 @@
         }finally{
           // ── キャプチャ後復元 ──
           whiteBgEls.forEach(function(o){if(o.bg.parentNode===o.el)o.el.removeChild(o.bg);});
-          imgPolyfills.forEach(({div,img})=>{if(div.parentNode)div.parentNode.replaceChild(img,div);});
+          imgRestores.forEach(function(o){try{if(o.img.src===o.blobUrl)o.img.src=o.origSrc;URL.revokeObjectURL(o.blobUrl);}catch(e){}});
           rhEls.forEach(el=>{el.style.display='';});
           selEls.forEach(el=>el.classList.add('dm-sel'));
           setSaving(false);
