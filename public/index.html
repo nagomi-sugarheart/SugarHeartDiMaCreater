@@ -601,7 +601,7 @@
         setSaving(true);
         const captures=[];
         const iframe=iframeRef.current;
-        let rhEls=[],selEls=[],imgPolyfills=[],dmPageEls=[];
+        let rhEls=[],selEls=[],imgPolyfills=[];
         try{
           if(!window.html2canvas||!iframe?.contentDocument)throw new Error("not ready");
           // ── キャプチャ前クリーンアップ ──
@@ -611,9 +611,6 @@
           // ②選択状態クラスを除去
           selEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-sel'));
           selEls.forEach(el=>el.classList.remove('dm-sel'));
-          // ③dm-pageのoverflowをhiddenに戻す（編集中はvisibleにしているため）
-          dmPageEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-page'));
-          dmPageEls.forEach(el=>{el.style.overflow='hidden';});
           // ③ img[data-daima^="image-"] を background-image div に差し替え
           //    html2canvasはCORS画像へのobject-fit:coverを正しく処理できない場合がある
           //    background-size:coverはhtml2canvasで確実にサポートされているため代替として使用
@@ -675,12 +672,24 @@
           const targets=pageEls.length>0?pageEls:[iframe.contentDocument.documentElement];
           for(const target of targets){
             try{
-              const canvas=await window.html2canvas(target,{
+              // dm-pageのoverfow:visibleで拡張されたcanvasをpx単位で手動クロップ
+              // → overflow:hiddenによるクリッピングを使わず、常に正確なページ寸法に合わせる
+              const pw=target.offsetWidth,ph=target.offsetHeight;
+              const rawCanvas=await window.html2canvas(target,{
                 useCORS:true,allowTaint:false,scale:2,logging:false,
                 backgroundColor:null,imageTimeout:15000,
                 scrollX:0,scrollY:0,windowWidth:360,
               });
-              captures.push(canvas.toDataURL("image/png"));
+              // キャンバスサイズがdm-pageのサイズ(scale:2)と一致しない場合にクロップ
+              const sw=pw*2,sh=ph*2;
+              if(rawCanvas.width===sw&&rawCanvas.height===sh){
+                captures.push(rawCanvas.toDataURL("image/png"));
+              }else{
+                const cropped=document.createElement('canvas');
+                cropped.width=sw;cropped.height=sh;
+                cropped.getContext('2d').drawImage(rawCanvas,0,0);
+                captures.push(cropped.toDataURL("image/png"));
+              }
             }catch(e){
               console.warn("Page capture failed:",e);
               captures.push(null);
@@ -693,7 +702,6 @@
           imgPolyfills.forEach(({div,img})=>{if(div.parentNode)div.parentNode.replaceChild(img,div);});
           rhEls.forEach(el=>{el.style.display='';});
           selEls.forEach(el=>el.classList.add('dm-sel'));
-          dmPageEls.forEach(el=>{el.style.overflow='visible';});
           setSaving(false);
         }
         setCompletedUrls(captures.length>0?captures:[null]);
