@@ -471,6 +471,10 @@
             const el=doc.querySelector('[data-daima="'+id+'"]');
             if(el&&color)el.style.color=color;
           });
+          // 編集中はdm-pageのoverflow:hiddenを解除
+          // → テキスト移動時にページ境界でクリップされなくなる
+          // → 保存時(handleSave)に hidden に戻す
+          Array.from(doc.querySelectorAll('.dm-page')).forEach(el=>{el.style.overflow='visible';});
         },150);
       },[]);
 
@@ -597,7 +601,7 @@
         setSaving(true);
         const captures=[];
         const iframe=iframeRef.current;
-        let rhEls=[],selEls=[],imgPolyfills=[];
+        let rhEls=[],selEls=[],imgPolyfills=[],dmPageEls=[];
         try{
           if(!window.html2canvas||!iframe?.contentDocument)throw new Error("not ready");
           // ── キャプチャ前クリーンアップ ──
@@ -607,6 +611,9 @@
           // ②選択状態クラスを除去
           selEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-sel'));
           selEls.forEach(el=>el.classList.remove('dm-sel'));
+          // ③dm-pageのoverflowをhiddenに戻す（編集中はvisibleにしているため）
+          dmPageEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-page'));
+          dmPageEls.forEach(el=>{el.style.overflow='hidden';});
           // ③ img[data-daima^="image-"] を background-image div に差し替え
           //    html2canvasはCORS画像へのobject-fit:coverを正しく処理できない場合がある
           //    background-size:coverはhtml2canvasで確実にサポートされているため代替として使用
@@ -686,6 +693,7 @@
           imgPolyfills.forEach(({div,img})=>{if(div.parentNode)div.parentNode.replaceChild(img,div);});
           rhEls.forEach(el=>{el.style.display='';});
           selEls.forEach(el=>el.classList.add('dm-sel'));
+          dmPageEls.forEach(el=>{el.style.overflow='visible';});
           setSaving(false);
         }
         setCompletedUrls(captures.length>0?captures:[null]);
@@ -803,12 +811,19 @@
           const val=t[k]!==undefined?t[k]:(defVal||0);
           const pct=Math.min(100,Math.max(0,((val-min)/(max-min)*100))).toFixed(1);
           const decimals=step<1?(String(step).split('.')[1]||'').length:0;
+          const displayVal=parseFloat(val.toFixed(decimals));
+          const applyNum=(raw)=>{const v=parseFloat(raw);if(!isNaN(v))update(k,Math.min(max,Math.max(min,v)));};
           return(
             <div style={{marginBottom:"5px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:"0.69rem",color:C.gray,marginBottom:"2px"}}>
                 <span>{lbl}</span>
-                <input type="number" min={min} max={max} step={step} value={parseFloat(val.toFixed(decimals))}
-                  onChange={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))update(k,Math.min(max,Math.max(min,v)));}}
+                {/* key=displayVal: rangeスライダー操作時だけinputを再マウントして表示値を同期
+                    入力中はkeyが変わらないのでキーボードが閉じない */}
+                <input type="number" min={min} max={max} step={step}
+                  key={displayVal}
+                  defaultValue={displayVal}
+                  onBlur={e=>applyNum(e.target.value)}
+                  onKeyDown={e=>{if(e.key==='Enter'){applyNum(e.target.value);e.target.blur();}}}
                   style={{width:"58px",padding:"1px 4px",border:`1px solid ${C.pink}`,borderRadius:"5px",fontSize:"0.7rem",color:C.dark,fontFamily:FONT,textAlign:"right",background:C.white}} />
               </div>
               <input type="range" min={min} max={max} step={step} value={val}
