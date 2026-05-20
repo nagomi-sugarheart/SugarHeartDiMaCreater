@@ -233,7 +233,7 @@
           else{var c=gc();var a=Math.atan2(cy-c.cy,cx-c.cx)*180/Math.PI;ST[id]={x:st.x,y:st.y,r:st.r+(a-sa),s:st.s||1,fs:st.fs||100};}
           applyT(el,ST[id]);
         }
-        function end(){if(mode){if(!moved&&isText){notifyTap(id,el.innerText);}else{notify(id);}mode=null;}}
+        function end(){if(mode){if(mode==='drag'&&!moved&&isText){notifyTap(id,el.innerText);}else if(mode==='rotate'||moved){notify(id);}mode=null;}}
 
         el.addEventListener('mousedown',function(e){
           if(e.target===rh)return;
@@ -821,18 +821,27 @@
         ...imgIds.map(id=>'image-'+id),
         ...(imgIds.length===0?Object.keys(autoImgs).sort((a,b)=>+a-+b).map(n=>'image-'+n):[]),
       ],[textIds,imgIds,autoTexts,autoImgs]);
+      const allTextIds=useMemo(()=>[
+        ...textIds.map(id=>'text-'+id),
+        ...(textIds.length===0?Object.keys(autoTexts).sort((a,b)=>+a-+b).map(n=>'text-'+n):[]),
+      ],[textIds,autoTexts]);
+      const allImgIds=useMemo(()=>[
+        ...imgIds.map(id=>'image-'+id),
+        ...(imgIds.length===0?Object.keys(autoImgs).sort((a,b)=>+a-+b).map(n=>'image-'+n):[]),
+      ],[imgIds,autoImgs]);
 
       const TransformPanel=({elemId})=>{
         const isText=elemId.startsWith("text-");
+        const num=elemId.split("-")[1];
         const t=trans[elemId]||{x:0,y:0,r:0,s:1,fs:100};
         const isHidden=hiddenElems.includes(elemId);
-        const label=isText?`テキスト ${elemId.split("-")[1]}`:`画像 ${elemId.split("-")[1]}`;
+        const label=isText?"テキスト "+num:"画像 "+num;
         const defaults={x:0,y:0,r:0,s:1,fs:100};
         const update=(key,val)=>{
           const nt={...transRef.current,[elemId]:{...(transRef.current[elemId]||defaults),[key]:val}};
           setTrans(nt);applyTrans(nt);
         };
-        const Row=({lbl,k,min,max,step,unit,defVal})=>{
+        const Row=({lbl,k,min,max,step,defVal})=>{
           const val=t[k]!==undefined?t[k]:(defVal||0);
           const pct=Math.min(100,Math.max(0,((val-min)/(max-min)*100))).toFixed(1);
           const decimals=step<1?(String(step).split('.')[1]||'').length:0;
@@ -842,48 +851,84 @@
             <div style={{marginBottom:"5px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:"0.69rem",color:C.gray,marginBottom:"2px"}}>
                 <span>{lbl}</span>
-                {/* key=displayVal: rangeスライダー操作時だけinputを再マウントして表示値を同期
-                    入力中はkeyが変わらないのでキーボードが閉じない */}
                 <input type="number" min={min} max={max} step={step}
                   key={displayVal}
                   defaultValue={displayVal}
                   onBlur={e=>applyNum(e.target.value)}
                   onKeyDown={e=>{if(e.key==='Enter'){applyNum(e.target.value);e.target.blur();}}}
-                  style={{width:"58px",padding:"1px 4px",border:`1px solid ${C.pink}`,borderRadius:"5px",fontSize:"0.7rem",color:C.dark,fontFamily:FONT,textAlign:"right",background:C.white}} />
+                  style={{width:"58px",padding:"1px 4px",border:"1px solid "+C.pink,borderRadius:"5px",fontSize:"0.7rem",color:C.dark,fontFamily:FONT,textAlign:"right",background:C.white}} />
               </div>
               <input type="range" min={min} max={max} step={step} value={val}
                 onChange={e=>update(k,Number(e.target.value))}
-                style={{width:"100%",accentColor:C.dark,cursor:"pointer",background:`linear-gradient(to right,${C.dark} 0%,${C.dark} ${pct}%,#F0D0D8 ${pct}%,#F0D0D8 100%)`}} />
+                style={{width:"100%",accentColor:C.dark,cursor:"pointer",background:"linear-gradient(to right,"+C.dark+" 0%,"+C.dark+" "+pct+"%,#F0D0D8 "+pct+"%,#F0D0D8 100%)"}} />
             </div>
           );
         };
+        const isAutoText=isText&&(textIds.length===0||!textIds.includes(num));
+        const textContent=isText?(isAutoText?(autoTexts[num]||""):(textVals[num]||"")):"";
+        const color=textColors[elemId]||"";
+        const isAutoImg=!isText&&(imgIds.length===0||!imgIds.includes(num));
+        const currentImgUrl=!isText?(isAutoImg?autoImgs[num]:imgUrls[num]):"";
         return(
           <div style={{background:isHidden?"#f5f5f5":C.mid,borderRadius:"10px",padding:"10px 12px",marginBottom:"8px",opacity:isHidden?0.6:1,transition:"all 0.2s"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"7px",gap:"5px",flexWrap:"wrap"}}>
               <span style={{fontSize:"0.75rem",fontWeight:"bold",color:C.dark,flex:1}}>{label}</span>
-              {isText&&(
-                <button onClick={()=>{
-                  const num=elemId.replace("text-","");
-                  const isAuto=textIds.length===0||!textIds.includes(num);
-                  setEditModal({id:elemId,num,text:(isAuto?autoTexts[num]:textVals[num])||"",fs:t.fs||100,color:textColors[elemId]||""});
-                }} style={{fontSize:"0.66rem",color:C.white,background:C.dark,border:"none",borderRadius:"5px",padding:"3px 8px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>
-                  ✎ 文字を編集
-                </button>
+              {!isText&&currentImgUrl&&(
+                <button onClick={()=>{if(isAutoImg){setAutoImgs(p=>({...p,[num]:""}));}else{setImgUrls(p=>({...p,[num]:""}));}}}
+                  style={{fontSize:"0.66rem",color:"#999",background:"none",border:"1px solid #ccc",borderRadius:"5px",padding:"2px 6px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>✕ クリア</button>
               )}
-              <button onClick={()=>toggleHide(elemId)} style={{fontSize:"0.66rem",color:isHidden?C.dark:"#888",background:C.white,border:`1px solid ${isHidden?C.pink:"#ddd"}`,borderRadius:"5px",padding:"2px 7px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>
+              <button onClick={()=>toggleHide(elemId)} style={{fontSize:"0.66rem",color:isHidden?C.dark:"#888",background:C.white,border:"1px solid "+(isHidden?C.pink:"#ddd"),borderRadius:"5px",padding:"2px 7px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>
                 {isHidden?"👁 表示":"🙈 非表示"}
               </button>
-              <button onClick={()=>{const nt={...transRef.current,[elemId]:defaults};setTrans(nt);applyTrans(nt);}} style={{fontSize:"0.66rem",color:C.gray,background:"none",border:`1px solid #ccc`,borderRadius:"5px",padding:"2px 6px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>↺</button>
+              <button onClick={()=>{const nt={...transRef.current,[elemId]:defaults};setTrans(nt);applyTrans(nt);}} style={{fontSize:"0.66rem",color:C.gray,background:"none",border:"1px solid #ccc",borderRadius:"5px",padding:"2px 6px",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>↺</button>
             </div>
             {!isHidden&&(
               <>
-                <Row lbl="← 左右 →"   k="x"  min={-200} max={200} step={1}    unit="px"  defVal={0}   />
-                <Row lbl="↑ 上下 ↓"   k="y"  min={-300} max={300} step={1}    unit="px"  defVal={0}   />
-                <Row lbl="↺ 回転"     k="r"  min={-180}  max={180} step={0.5}  unit="°"   defVal={0}   />
-                <Row lbl="🔍 拡大縮小" k="s"  min={0.1}  max={3}   step={0.05} unit="x"   defVal={1}   />
                 {isText&&(
-                  <Row lbl="🅰 文字サイズ" k="fs" min={30} max={300} step={5} unit="%" defVal={100} />
+                  <>
+                    <textarea value={textContent} rows={2}
+                      onChange={e=>{
+                        const val=e.target.value;
+                        if(isAutoText){
+                          setAutoTexts(p=>({...p,[num]:val}));
+                          const el=iframeRef.current?.contentDocument?.querySelector('[data-daima="text-'+num+'"]');
+                          if(el){Array.from(el.childNodes).forEach(nd=>{if(nd.nodeType===3&&nd.textContent.trim())nd.textContent=val;});}
+                        }else{
+                          setTextVals(p=>({...p,[num]:val}));
+                        }
+                      }}
+                      placeholder={"テキスト"+num+"を入力..."}
+                      style={{...inp,resize:"vertical",fontSize:"0.9rem",background:C.white,border:"2px solid "+C.pink,marginBottom:"6px"}} />
+                    <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px"}}>
+                      <span style={{fontSize:"0.7rem",color:C.gray,flexShrink:0}}>文字色</span>
+                      <input type="color" value={color||"#333333"}
+                        onChange={e=>{
+                          const c=e.target.value;
+                          setTextColors(p=>({...p,[elemId]:c}));
+                          const el=iframeRef.current?.contentDocument?.querySelector('[data-daima="'+elemId+'"]');
+                          if(el)el.style.color=c;
+                        }}
+                        style={{width:"36px",height:"28px",border:"none",borderRadius:"5px",cursor:"pointer",padding:0,flexShrink:0}} />
+                      {color&&<button onClick={()=>{setTextColors(p=>({...p,[elemId]:""}));const el=iframeRef.current?.contentDocument?.querySelector('[data-daima="'+elemId+'"]');if(el)el.style.color="";}}
+                        style={{fontSize:"0.66rem",color:C.gray,background:"none",border:"1px solid #ccc",borderRadius:"4px",padding:"2px 5px",cursor:"pointer",fontFamily:FONT}}>リセット</button>}
+                    </div>
+                  </>
                 )}
+                {!isText&&(
+                  <>
+                    {currentImgUrl&&<img src={currentImgUrl} alt="" style={{width:"60px",height:"60px",objectFit:"cover",objectPosition:"top",borderRadius:"6px",border:"1.5px solid "+C.pink,marginBottom:"8px",display:"block"}} />}
+                    <ImagePicker imageId={isAutoImg?"auto-img-"+num:num} onSelect={isAutoImg?(url=>{
+                      setAutoImgs(p=>({...p,[num]:url}));
+                      const el=iframeRef.current?.contentDocument?.querySelector('[data-daima="image-'+num+'"]');
+                      if(el)el.src=url;
+                    }):undefined} />
+                  </>
+                )}
+                <Row lbl="← 左右 →"   k="x"  min={-200} max={200} step={1}    defVal={0}   />
+                <Row lbl="↑ 上下 ↓"   k="y"  min={-300} max={300} step={1}    defVal={0}   />
+                <Row lbl="↺ 回転"     k="r"  min={-180}  max={180} step={0.5}  defVal={0}   />
+                <Row lbl="🔍 拡大縮小" k="s"  min={0.1}  max={3}   step={0.05} defVal={1}   />
+                {isText&&<Row lbl="🅰 文字サイズ" k="fs" min={30} max={300} step={5} defVal={100} />}
               </>
             )}
           </div>
@@ -893,117 +938,22 @@
       // ══════════════════════════════════════════════
       // コントロールパネル
       // ══════════════════════════════════════════════
-      const hasPlaceholders=textIds.length>0||imgIds.length>0||Object.keys(autoTexts).length>0||Object.keys(autoImgs).length>0;
-
       const controlsPanel=(
-        <div style={{overflowY:"auto",background:C.white,padding:"15px",display:"flex",flexDirection:"column",gap:"14px",...(isMobile?{flex:1}:{width:"320px",minWidth:"300px",borderRight:`1px solid ${C.mid}`})}}>
+        <div style={{overflowY:"auto",background:C.white,padding:"15px",display:"flex",flexDirection:"column",gap:"14px",...(isMobile?{flex:1}:{width:"320px",minWidth:"300px",borderRight:"1px solid "+C.mid})}}>
           {error&&<div style={{padding:"9px 12px",background:"#fff0f0",border:"1px solid #ffcaca",borderRadius:"9px",color:"#d9534f",fontSize:"0.79rem"}}>⚠️ {error}</div>}
-          {!hasPlaceholders&&rawHtml&&<div style={{padding:"10px",background:"#fffbe6",border:"1px solid #ffe58f",borderRadius:"9px",fontSize:"0.79rem",color:"#8a6914"}}>⚠️ プレースホルダーが検出されませんでした。AIに修正依頼してみてください。</div>}
+          {!allImgIds.length&&!allTextIds.length&&rawHtml&&<div style={{padding:"10px",background:"#fffbe6",border:"1px solid #ffe58f",borderRadius:"9px",fontSize:"0.79rem",color:"#8a6914"}}>⚠️ プレースホルダーが検出されませんでした。AIに修正依頼してみてください。</div>}
 
-          {/* ══ テキスト編集（プレースホルダー方式） ══ */}
-          {textIds.length>0&&(
-            <section style={{background:C.mid,borderRadius:"14px",padding:"14px"}}>
-              <div style={{...SH,marginBottom:"12px"}}>✍️ テキストを編集する</div>
-              {textIds.map(id=>(
-                <div key={id} style={{marginBottom:"12px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
-                    <label style={{fontSize:"0.78rem",fontWeight:"bold",color:C.dark}}>テキスト {id}</label>
-                    <button onClick={()=>setEditModal({id:`text-${id}`,num:id,text:textVals[id]||"",fs:trans[`text-${id}`]?.fs||100,color:textColors[`text-${id}`]||""})}
-                      style={{fontSize:"0.72rem",color:C.white,background:C.dark,border:"none",borderRadius:"8px",padding:"4px 10px",cursor:"pointer",fontFamily:FONT}}>
-                      🅰 サイズも変える
-                    </button>
-                  </div>
-                  <textarea value={textVals[id]||""} rows={2}
-                    onChange={e=>setTextVals(p=>({...p,[id]:e.target.value}))}
-                    placeholder={`テキスト${id}を入力（そのまま打てます）`}
-                    style={{...inp,resize:"vertical",fontSize:"0.9rem",background:C.white,border:`2px solid ${C.pink}`}} />
-                </div>
-              ))}
-            </section>
-          )}
-
-          {/* ══ テキスト編集（自動抽出・iframeDOM直接操作・HTMLを壊さない） ══ */}
-          {textIds.length===0&&Object.keys(autoTexts).length>0&&(
-            <section style={{background:C.mid,borderRadius:"14px",padding:"14px"}}>
-              <div style={{...SH,marginBottom:"4px"}}>✍️ テキストを編集する</div>
-              <div style={{fontSize:"0.71rem",color:C.gray,marginBottom:"12px"}}>
-                プレビューを確認しながら直接入力できます
-              </div>
-              {Object.entries(autoTexts).map(([num,text])=>(
-                <div key={num} style={{marginBottom:"12px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
-                    <label style={{fontSize:"0.78rem",fontWeight:"bold",color:C.dark}}>テキスト {num}</label>
-                    <button onClick={()=>setEditModal({id:`text-${num}`,num,text,fs:trans[`text-${num}`]?.fs||100,color:textColors[`text-${num}`]||""})}
-                      style={{fontSize:"0.72rem",color:C.white,background:C.dark,border:"none",borderRadius:"8px",padding:"4px 10px",cursor:"pointer",fontFamily:FONT}}>
-                      🅰 サイズも変える
-                    </button>
-                  </div>
-                  <textarea value={text} rows={2}
-                    onChange={e=>{
-                      const val=e.target.value;
-                      setAutoTexts(p=>({...p,[num]:val}));
-                      // iframeのDOMを直接更新（リロードなし・即反映）
-                      const el=iframeRef.current?.contentDocument?.querySelector('[data-daima="text-'+num+'"]');
-                      if(el){Array.from(el.childNodes).forEach(nd=>{if(nd.nodeType===3&&nd.textContent.trim())nd.textContent=val;});}
-                    }}
-                    placeholder={"テキスト"+num+"を入力..."}
-                    style={{...inp,resize:"vertical",fontSize:"0.9rem",background:C.white,border:"2px solid "+C.pink}} />
-                </div>
-              ))}
-            </section>
-          )}
-
-          {imgIds.length>0&&(
+          {allImgIds.length>0&&(
             <section>
               <div style={SH}>🖼️ 画像</div>
-              {imgIds.map(id=>(
-                <div key={id} style={{marginBottom:"14px",padding:"12px",background:C.mid,borderRadius:"11px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"9px"}}>
-                    <div style={{fontSize:"0.73rem",color:C.dark,fontWeight:"bold"}}>画像 {id} {imgUrls[id]?"✅":""}</div>
-                    {imgUrls[id]&&(
-                      <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                        <img src={imgUrls[id]} alt="" style={{width:"32px",height:"32px",objectFit:"cover",objectPosition:"top",borderRadius:"5px",border:"1.5px solid "+C.pink}} />
-                        <button onClick={()=>setImgUrls(p=>({...p,[id]:""}))} style={{fontSize:"0.68rem",color:"#999",background:"none",border:"1px solid #ccc",borderRadius:"4px",padding:"2px 6px",cursor:"pointer"}}>✕</button>
-                      </div>
-                    )}
-                  </div>
-                  <ImagePicker imageId={id} />
-                </div>
-              ))}
+              {allImgIds.map(eid=><TransformPanel key={eid} elemId={eid}/>)}
             </section>
           )}
 
-          {imgIds.length===0&&Object.keys(autoImgs).length>0&&(
+          {allTextIds.length>0&&(
             <section>
-              <div style={SH}>🖼️ 画像</div>
-              <div style={{fontSize:"0.71rem",color:C.gray,marginBottom:"8px"}}>
-                ライブラリから差し替え画像を選べます
-              </div>
-              {Object.keys(autoImgs).sort((a,b)=>+a-+b).map(num=>(
-                <div key={num} style={{marginBottom:"14px",padding:"12px",background:C.mid,borderRadius:"11px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"9px"}}>
-                    <div style={{fontSize:"0.73rem",color:C.dark,fontWeight:"bold"}}>画像 {num}</div>
-                    {autoImgs[num]&&(
-                      <img src={autoImgs[num]} alt="" style={{width:"32px",height:"32px",objectFit:"cover",objectPosition:"top",borderRadius:"5px",border:"1.5px solid "+C.pink}} />
-                    )}
-                  </div>
-                  <ImagePicker imageId={"auto-img-"+num} onSelect={url=>{
-                    setAutoImgs(p=>({...p,[num]:url}));
-                    const el=iframeRef.current?.contentDocument?.querySelector('[data-daima="image-'+num+'"]');
-                    if(el)el.src=url;
-                  }} />
-                </div>
-              ))}
-            </section>
-          )}
-
-          {allElemIds.length>0&&(
-            <section>
-              <div style={SH}>🎯 位置・回転・拡大縮小</div>
-              <div style={{fontSize:"0.71rem",color:C.gray,marginBottom:"8px",lineHeight:1.5}}>
-                スライダーで数値調整 / プレビュー上でドラッグ移動・↻ 回転も可能
-              </div>
-              {allElemIds.map(eid=><TransformPanel key={eid} elemId={eid}/>)}
+              <div style={SH}>✍️ テキスト</div>
+              {allTextIds.map(eid=><TransformPanel key={eid} elemId={eid}/>)}
             </section>
           )}
 
@@ -1020,6 +970,7 @@
           <div style={{height:"6px"}}/>
         </div>
       );
+
 
       const previewPanel=(
         <div style={{background:"#e5e5e5",display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 12px 6px",gap:"5px",...(isMobile?{flex:1,overflow:"hidden"}:{flex:1,overflow:"hidden"})}}>
