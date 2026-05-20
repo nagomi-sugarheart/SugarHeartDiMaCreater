@@ -191,7 +191,7 @@
       [data-daima]:hover .dm-rh,[data-daima].dm-sel .dm-rh{opacity:1!important}
       [data-daima^="text-"]::after{content:'✎';position:absolute!important;bottom:-22px!important;left:50%!important;transform:translateX(-50%)!important;font-size:13px!important;background:#E8B4C0!important;color:white!important;border-radius:10px!important;padding:1px 7px!important;opacity:0!important;transition:opacity 0.18s!important;white-space:nowrap!important;font-style:normal!important;pointer-events:none!important;z-index:99998!important;}
       [data-daima^="text-"]:hover::after,[data-daima^="text-"].dm-sel::after{opacity:1!important;}
-      img[data-daima^="image-"],[data-daima^="image-"] img{object-fit:cover!important;object-position:center center!important;}
+      img[data-daima^="image-"],[data-daima^="image-"] img{object-fit:cover!important;object-position:center center!important;width:100%!important;height:100%!important;}
     `;
 
     // タップでモーダルを開く版（contenteditable廃止）
@@ -597,16 +597,58 @@
         setSaving(true);
         const captures=[];
         const iframe=iframeRef.current;
-        let rhEls=[],selEls=[];
+        let rhEls=[],selEls=[],imgPolyfills=[];
         try{
           if(!window.html2canvas||!iframe?.contentDocument)throw new Error("not ready");
           // ── キャプチャ前クリーンアップ ──
           // ①回転ハンドル(.dm-rh)を非表示（dm-cssは除去しない→レイアウト崩れ防止）
           rhEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-rh'));
           rhEls.forEach(el=>{el.style.display='none';});
-          // ②選択状態クラスを除去（hover/selスタイルが入らないよう）
+          // ②選択状態クラスを除去
           selEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-sel'));
           selEls.forEach(el=>el.classList.remove('dm-sel'));
+          // ③ img[data-daima^="image-"] を background-image div に差し替え
+          //    html2canvasはCORS画像へのobject-fit:coverを正しく処理できない場合がある
+          //    background-size:coverはhtml2canvasで確実にサポートされているため代替として使用
+          const imgEls=Array.from(iframe.contentDocument.querySelectorAll(
+            'img[data-daima^="image-"],[data-daima^="image-"] img'
+          ));
+          for(const img of imgEls){
+            // 未ロード・srcなし・サイズ0はスキップ
+            if(!img.getAttribute('src')||!img.complete||img.naturalWidth===0)continue;
+            const w=img.offsetWidth,h=img.offsetHeight;
+            if(!w||!h)continue;
+            // computedStyleでレイアウト系プロパティを取得（classベースCSSも含む）
+            const cs=iframe.contentWindow.getComputedStyle(img);
+            const div=iframe.contentDocument.createElement('div');
+            // レイアウトに影響するプロパティをcomputedStyleからコピー
+            div.style.position=cs.position==='static'?'relative':cs.position;
+            div.style.top=cs.top;
+            div.style.left=cs.left;
+            div.style.right=cs.right;
+            div.style.bottom=cs.bottom;
+            div.style.zIndex=cs.zIndex;
+            div.style.float=cs.float;
+            div.style.margin=cs.margin;
+            div.style.flexShrink=cs.flexShrink;
+            div.style.flexGrow=cs.flexGrow;
+            div.style.alignSelf=cs.alignSelf;
+            if(cs.transform&&cs.transform!=='none')div.style.transform=cs.transform;
+            // サイズをpx固定（この時点の描画サイズを維持）
+            div.style.width=w+'px';
+            div.style.height=h+'px';
+            div.style.display='block';
+            // background-imageでcover表示
+            const safeSrc=img.src.replace(/"/g,'%22');
+            div.style.backgroundImage='url("'+safeSrc+'")';
+            div.style.backgroundSize='cover';
+            div.style.backgroundPosition='center center';
+            div.style.backgroundRepeat='no-repeat';
+            // data-daima属性を引き継ぐ
+            if(img.hasAttribute('data-daima'))div.setAttribute('data-daima',img.getAttribute('data-daima'));
+            img.parentNode.replaceChild(div,img);
+            imgPolyfills.push({div,img});
+          }
           // スクロールをトップにリセット
           try{
             iframe.contentWindow.scrollTo(0,0);
@@ -641,6 +683,7 @@
           console.error("Save failed:",err);
         }finally{
           // ── キャプチャ後復元 ──
+          imgPolyfills.forEach(({div,img})=>{if(div.parentNode)div.parentNode.replaceChild(img,div);});
           rhEls.forEach(el=>{el.style.display='';});
           selEls.forEach(el=>el.classList.add('dm-sel'));
           setSaving(false);
@@ -758,12 +801,15 @@
         };
         const Row=({lbl,k,min,max,step,unit,defVal})=>{
           const val=t[k]!==undefined?t[k]:(defVal||0);
-          const pct=((val-min)/(max-min)*100).toFixed(1);
+          const pct=Math.min(100,Math.max(0,((val-min)/(max-min)*100))).toFixed(1);
+          const decimals=step<1?(String(step).split('.')[1]||'').length:0;
           return(
             <div style={{marginBottom:"5px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:"0.69rem",color:C.gray,marginBottom:"2px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:"0.69rem",color:C.gray,marginBottom:"2px"}}>
                 <span>{lbl}</span>
-                <span style={{color:C.dark,fontWeight:"bold"}}>{Math.round(val*10)/10}{unit}</span>
+                <input type="number" min={min} max={max} step={step} value={parseFloat(val.toFixed(decimals))}
+                  onChange={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))update(k,Math.min(max,Math.max(min,v)));}}
+                  style={{width:"58px",padding:"1px 4px",border:`1px solid ${C.pink}`,borderRadius:"5px",fontSize:"0.7rem",color:C.dark,fontFamily:FONT,textAlign:"right",background:C.white}} />
               </div>
               <input type="range" min={min} max={max} step={step} value={val}
                 onChange={e=>update(k,Number(e.target.value))}
