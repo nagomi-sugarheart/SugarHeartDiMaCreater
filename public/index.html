@@ -601,7 +601,7 @@
         setSaving(true);
         const captures=[];
         const iframe=iframeRef.current;
-        let rhEls=[],selEls=[],imgPolyfills=[];
+        let rhEls=[],selEls=[],imgPolyfills=[],whiteBgEls=[];
         try{
           if(!window.html2canvas||!iframe?.contentDocument)throw new Error("not ready");
           // ── キャプチャ前クリーンアップ ──
@@ -653,6 +653,13 @@
             img.parentNode.replaceChild(div,img);
             imgPolyfills.push({div,img});
           }
+          // ④ dm-page最下層に白背景divを挿入（透過部分の黒ずみ防止）
+          Array.from(iframe.contentDocument.querySelectorAll('.dm-page')).forEach(function(pageEl){
+            var bg=iframe.contentDocument.createElement('div');
+            bg.style.cssText='position:absolute;inset:0;background:#ffffff;z-index:0;pointer-events:none;';
+            pageEl.insertBefore(bg,pageEl.firstChild);
+            whiteBgEls.push({el:pageEl,bg:bg});
+          });
           // スクロールをトップにリセット
           try{
             iframe.contentWindow.scrollTo(0,0);
@@ -677,7 +684,7 @@
               const pw=target.offsetWidth,ph=target.offsetHeight;
               const rawCanvas=await window.html2canvas(target,{
                 useCORS:true,allowTaint:false,scale:2,logging:false,
-                backgroundColor:null,imageTimeout:15000,
+                backgroundColor:'#ffffff',imageTimeout:15000,
                 scrollX:0,scrollY:0,windowWidth:360,
               });
               // キャンバスサイズがdm-pageのサイズ(scale:2)と一致しない場合にクロップ
@@ -699,6 +706,7 @@
           console.error("Save failed:",err);
         }finally{
           // ── キャプチャ後復元 ──
+          whiteBgEls.forEach(function(o){if(o.bg.parentNode===o.el)o.el.removeChild(o.bg);});
           imgPolyfills.forEach(({div,img})=>{if(div.parentNode)div.parentNode.replaceChild(img,div);});
           rhEls.forEach(el=>{el.style.display='';});
           selEls.forEach(el=>el.classList.add('dm-sel'));
