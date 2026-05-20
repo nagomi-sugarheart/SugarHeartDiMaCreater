@@ -191,7 +191,7 @@
       [data-daima]:hover .dm-rh,[data-daima].dm-sel .dm-rh{opacity:1!important}
       [data-daima^="text-"]::after{content:'✎';position:absolute!important;bottom:-22px!important;left:50%!important;transform:translateX(-50%)!important;font-size:13px!important;background:#E8B4C0!important;color:white!important;border-radius:10px!important;padding:1px 7px!important;opacity:0!important;transition:opacity 0.18s!important;white-space:nowrap!important;font-style:normal!important;pointer-events:none!important;z-index:99998!important;}
       [data-daima^="text-"]:hover::after,[data-daima^="text-"].dm-sel::after{opacity:1!important;}
-      img[data-daima^="image-"],[data-daima^="image-"] img{object-fit:cover!important;object-position:center center!important;}
+      img[data-daima^="image-"],[data-daima^="image-"] img{object-fit:cover!important;object-position:center center!important;width:100%!important;height:100%!important;}
     `;
 
     // タップでモーダルを開く版（contenteditable廃止）
@@ -608,27 +608,43 @@
           selEls=Array.from(iframe.contentDocument.querySelectorAll('.dm-sel'));
           selEls.forEach(el=>el.classList.remove('dm-sel'));
           // ③ img[data-daima^="image-"] を background-image div に差し替え
-          //    → html2canvasがobject-fit:coverを正しく処理できない問題を回避
+          //    html2canvasはCORS画像へのobject-fit:coverを正しく処理できない場合がある
+          //    background-size:coverはhtml2canvasで確実にサポートされているため代替として使用
           const imgEls=Array.from(iframe.contentDocument.querySelectorAll(
             'img[data-daima^="image-"],[data-daima^="image-"] img'
           ));
           for(const img of imgEls){
-            if(!img.src)continue;
+            // 未ロード・srcなし・サイズ0はスキップ
+            if(!img.getAttribute('src')||!img.complete||img.naturalWidth===0)continue;
             const w=img.offsetWidth,h=img.offsetHeight;
             if(!w||!h)continue;
+            // computedStyleでレイアウト系プロパティを取得（classベースCSSも含む）
+            const cs=iframe.contentWindow.getComputedStyle(img);
             const div=iframe.contentDocument.createElement('div');
-            // 元のinline styleをコピー（position/transform等を引き継ぐ）
-            div.style.cssText=img.style.cssText;
-            // background-imageでカバー表示（html2canvasはbackground-size:coverをサポート）
-            div.style.backgroundImage='url("'+img.src+'")';
-            div.style.backgroundSize='cover';
-            div.style.backgroundPosition='center center';
-            div.style.backgroundRepeat='no-repeat';
+            // レイアウトに影響するプロパティをcomputedStyleからコピー
+            div.style.position=cs.position==='static'?'relative':cs.position;
+            div.style.top=cs.top;
+            div.style.left=cs.left;
+            div.style.right=cs.right;
+            div.style.bottom=cs.bottom;
+            div.style.zIndex=cs.zIndex;
+            div.style.float=cs.float;
+            div.style.margin=cs.margin;
+            div.style.flexShrink=cs.flexShrink;
+            div.style.flexGrow=cs.flexGrow;
+            div.style.alignSelf=cs.alignSelf;
+            if(cs.transform&&cs.transform!=='none')div.style.transform=cs.transform;
+            // サイズをpx固定（この時点の描画サイズを維持）
             div.style.width=w+'px';
             div.style.height=h+'px';
             div.style.display='block';
-            div.style.objectFit='';
-            // data-daima属性をdivに引き継ぐ（imgに付いている場合）
+            // background-imageでcover表示
+            const safeSrc=img.src.replace(/"/g,'%22');
+            div.style.backgroundImage='url("'+safeSrc+'")';
+            div.style.backgroundSize='cover';
+            div.style.backgroundPosition='center center';
+            div.style.backgroundRepeat='no-repeat';
+            // data-daima属性を引き継ぐ
             if(img.hasAttribute('data-daima'))div.setAttribute('data-daima',img.getAttribute('data-daima'));
             img.parentNode.replaceChild(div,img);
             imgPolyfills.push({div,img});
