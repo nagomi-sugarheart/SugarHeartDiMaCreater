@@ -803,12 +803,19 @@
           const val=t[k]!==undefined?t[k]:(defVal||0);
           const pct=Math.min(100,Math.max(0,((val-min)/(max-min)*100))).toFixed(1);
           const decimals=step<1?(String(step).split('.')[1]||'').length:0;
+          const displayVal=parseFloat(val.toFixed(decimals));
+          const applyNum=(raw)=>{const v=parseFloat(raw);if(!isNaN(v))update(k,Math.min(max,Math.max(min,v)));};
           return(
             <div style={{marginBottom:"5px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:"0.69rem",color:C.gray,marginBottom:"2px"}}>
                 <span>{lbl}</span>
-                <input type="number" min={min} max={max} step={step} value={parseFloat(val.toFixed(decimals))}
-                  onChange={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))update(k,Math.min(max,Math.max(min,v)));}}
+                {/* key=displayVal: rangeスライダー操作時だけinputを再マウントして表示値を同期
+                    入力中はkeyが変わらないのでキーボードが閉じない */}
+                <input type="number" min={min} max={max} step={step}
+                  key={displayVal}
+                  defaultValue={displayVal}
+                  onBlur={e=>applyNum(e.target.value)}
+                  onKeyDown={e=>{if(e.key==='Enter'){applyNum(e.target.value);e.target.blur();}}}
                   style={{width:"58px",padding:"1px 4px",border:`1px solid ${C.pink}`,borderRadius:"5px",fontSize:"0.7rem",color:C.dark,fontFamily:FONT,textAlign:"right",background:C.white}} />
               </div>
               <input type="range" min={min} max={max} step={step} value={val}
