@@ -173,6 +173,7 @@
    - 長々とした解説文は避け、キャッチコピーを大きくスタイリッシュに魅せる構成にする。
 5. **必須エンディング**: 最終ページ末尾に必ず「総選挙での投票を促す一文」と、小さく目立たない色の「#しゅがーはぁとを心デレラに」を配置。
 6. **CSS装飾**: 最終出力はpng画像になるため、アニメーションは不要。絵文字は使わず洗練されたデザインにすること。body { margin:0; padding:0; } を必ず設定。
+   - **【禁止】グラデーションテキスト（-webkit-background-clip:text / background-clip:text）は絶対に使用しないこと。** 保存時にhtml2canvasが対応していないため文字が消えるバグになる。テキストにグラデーション風の表現をしたい場合は、テキスト要素の背景にグラデーションdivを重ねる等の代替手段を使うこと。
 
 # システム出力ルール
 * HTMLコード（\`\`\`htmlブロック）のみを出力。解説文・挨拶文・マークダウン説明は一切含めない。
@@ -886,8 +887,11 @@
               <>
                 {isText&&(
                   <>
-                    <textarea value={textContent} rows={2}
-                      onChange={e=>{
+                    <textarea
+                      key={elemId+'|'+textContent}
+                      defaultValue={textContent}
+                      rows={2}
+                      onBlur={e=>{
                         const val=e.target.value;
                         if(isAutoText){
                           setAutoTexts(p=>({...p,[num]:val}));
